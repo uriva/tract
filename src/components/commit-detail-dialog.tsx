@@ -8,7 +8,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { InlineDiffView } from "@/components/inline-diff-view";
 
 interface Commit {
@@ -48,8 +47,8 @@ export function CommitDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="font-mono text-sm">
             {commit.id.slice(0, 7)}
           </DialogTitle>
@@ -58,18 +57,18 @@ export function CommitDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <p className="text-sm">{commit.message}</p>
+        <p className="text-sm shrink-0">{commit.message}</p>
 
-        <div className="flex-1 min-h-0">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 shrink-0">
             Changes
           </div>
-          <ScrollArea className="max-h-[50vh] rounded-lg border border-border overflow-hidden">
+          <div className="flex-1 min-h-0 rounded-lg border border-border overflow-y-auto">
             <InlineDiffView
               baseContent={parentCommit?.content ?? ""}
               compareContent={commit.content}
             />
-          </ScrollArea>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
