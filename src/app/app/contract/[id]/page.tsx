@@ -18,6 +18,15 @@ import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
 import { InlineDiffView } from "@/components/inline-diff-view";
 import { CommitDetailDialog } from "@/components/commit-detail-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SignDialog } from "@/components/sign-dialog";
 import { displayName, assignParticipantColors } from "@/lib/utils";
 
@@ -268,11 +277,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
     }
   }
 
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [includeSignature, setIncludeSignature] = useState(true);
   const pendingDownload = useRef(false);
 
   function downloadPdf(legalName?: string, signatureData?: string) {
     if (!contract) return;
     setDownloading(true);
+    const withSig = includeSignature;
     const sigName = legalName ?? myParticipant?.legalName;
     const sigData = signatureData ?? myParticipant?.signatureData;
     fetch("/api/pdf", {
@@ -281,7 +293,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
       body: JSON.stringify({
         title: contract.name,
         content: displayContent,
-        signature: sigName && sigData ? { legalName: sigName, signatureData: sigData, signedAt: myParticipant?.signedAt ?? Date.now() } : undefined,
+        signature: withSig && sigName && sigData ? { legalName: sigName, signatureData: sigData, signedAt: myParticipant?.signedAt ?? Date.now() } : undefined,
       }),
     })
       .then((res) => {
@@ -297,13 +309,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
         URL.revokeObjectURL(url);
       })
       .catch((e) => console.error("PDF download failed:", e))
-      .finally(() => setDownloading(false));
+      .finally(() => {
+        setDownloading(false);
+        setDownloadOpen(false);
+      });
   }
 
-  async function handleDownloadPdf() {
-    if (!contract) return;
-    // If no signature saved yet, prompt to draw one first
-    if (!myParticipant?.signatureData) {
+  function handleDownloadConfirm() {
+    if (includeSignature && !myParticipant?.signatureData) {
       pendingDownload.current = true;
       setSignOpen(true);
       return;
@@ -413,7 +426,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleDownloadPdf}
+            onClick={() => setDownloadOpen(true)}
             disabled={downloading || !displayContent.trim()}
           >
             {downloading ? "Generating..." : "Download PDF"}
@@ -649,6 +662,46 @@ function ContractEditor({ contractId }: { contractId: string }) {
         onSign={handleSign}
         existingName={myParticipant?.legalName ?? undefined}
       />
+
+      <Dialog open={downloadOpen} onOpenChange={setDownloadOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Download PDF</DialogTitle>
+            <DialogDescription>
+              Export this contract as a PDF document.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <Checkbox
+                checked={includeSignature}
+                onCheckedChange={(v) => setIncludeSignature(!!v)}
+              />
+              <div>
+                <span className="text-sm">Include my signature</span>
+                {includeSignature && !myParticipant?.signatureData && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    You&apos;ll be asked to draw your signature
+                  </p>
+                )}
+                {includeSignature && myParticipant?.signatureData && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Signed as {myParticipant.legalName}
+                  </p>
+                )}
+              </div>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setDownloadOpen(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleDownloadConfirm} disabled={downloading}>
+              {downloading ? "Generating..." : "Download"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
