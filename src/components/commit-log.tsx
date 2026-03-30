@@ -296,20 +296,6 @@ export function CommitLog({
                   )}
                   {authorLabel} &middot; {getTimeAgo(commit.createdAt)}
                 </div>
-
-                {isViewing && !isHead && onCheckout && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-1 h-5 text-[10px] w-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCheckout(commit.id);
-                    }}
-                  >
-                    Use this version
-                  </Button>
-                )}
               </button>
             );
           })}

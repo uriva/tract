@@ -92,7 +92,7 @@ export function ParticipantList({
             )}
 
             {hasDivergence && !theyAreAhead && (
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">reviewing</span>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">yet to approve</span>
             )}
 
             {!hasDivergence && theirHead && (

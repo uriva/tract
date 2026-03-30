@@ -5,7 +5,10 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemi
 
 export async function POST(req: NextRequest) {
   if (!GEMINI_API_KEY) {
-    return NextResponse.json({ message: "Update contract" });
+    return NextResponse.json(
+      { error: "GEMINI_API_KEY not configured" },
+      { status: 500 },
+    );
   }
 
   const { oldContent, newContent } = await req.json();
@@ -40,12 +43,24 @@ Commit message:`,
   });
 
   if (!res.ok) {
-    return NextResponse.json({ message: "Update contract" });
+    const err = await res.text();
+    console.error("Gemini API error:", err);
+    return NextResponse.json(
+      { error: "Failed to generate commit description" },
+      { status: 502 },
+    );
   }
 
   const data = await res.json();
   const msg =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "Update contract";
+    data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+  if (!msg) {
+    return NextResponse.json(
+      { error: "Empty response from model" },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json({ message: msg });
 }

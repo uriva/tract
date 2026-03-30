@@ -26,6 +26,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [tractOpen, setTractOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [commitError, setCommitError] = useState("");
   const [mode, setMode] = useState<Mode>("view");
   const [viewingCommitId, setViewingCommitId] = useState<string | null>(null);
 
@@ -116,6 +117,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const handleCommit = useCallback(async () => {
     if (!hasChanges || !user || !myParticipant || content === null) return;
     setSaving(true);
+    setCommitError("");
 
     let msg = commitMsg.trim();
     if (!msg) {
@@ -128,10 +130,16 @@ function ContractEditor({ contractId }: { contractId: string }) {
             newContent: content,
           }),
         });
+        if (!res.ok) throw new Error("Failed to generate description");
         const data = await res.json();
-        msg = data.message || "Update contract";
-      } catch {
-        msg = "Update contract";
+        if (!data.message) throw new Error("Empty description returned");
+        msg = data.message;
+      } catch (e) {
+        setSaving(false);
+        setCommitError(
+          e instanceof Error ? e.message : "Could not generate commit description. Please enter one manually.",
+        );
+        return;
       }
     }
 
@@ -320,19 +328,29 @@ function ContractEditor({ contractId }: { contractId: string }) {
               />
 
               {hasChanges && (
-                <div className="flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-accent/5">
-                  <Input
-                    className="flex-1 text-sm h-9"
-                    placeholder="Commit message (optional)"
-                    value={commitMsg}
-                    onChange={(e) => setCommitMsg(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleCommit();
-                    }}
-                  />
-                  <Button size="sm" onClick={handleCommit} disabled={saving}>
-                    {saving ? "Saving..." : "Commit"}
-                  </Button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-accent/5">
+                    <Input
+                      className="flex-1 text-sm h-9"
+                      placeholder="Description (auto-generated if empty)"
+                      value={commitMsg}
+                      onChange={(e) => {
+                        setCommitMsg(e.target.value);
+                        setCommitError("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleCommit();
+                      }}
+                    />
+                    <Button size="sm" onClick={handleCommit} disabled={saving}>
+                      {saving ? "Saving..." : "Commit"}
+                    </Button>
+                  </div>
+                  {commitError && (
+                    <div className="text-xs text-red-500 px-3">
+                      {commitError}
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -358,6 +376,21 @@ function ContractEditor({ contractId }: { contractId: string }) {
               <div className="min-h-[500px] p-6 rounded-lg border border-border bg-card">
                 <MarkdownView content={displayContent} />
               </div>
+
+              {/* Adopt bar — shown when viewing a historical commit */}
+              {isViewingHistory && (
+                <div className="flex items-center justify-between p-3 rounded-lg border border-accent/30 bg-accent/5">
+                  <p className="text-sm text-muted-foreground">
+                    Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
+                    {activeCommit?.author?.email
+                      ? ` by ${activeCommit.author.email.split("@")[0]}`
+                      : " by Tract"}
+                  </p>
+                  <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
+                    Adopt this version
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
