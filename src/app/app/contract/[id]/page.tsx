@@ -505,7 +505,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
               )}
 
               {/* Last commit note */}
-              {activeCommit?.message && (
+              {activeCommit?.message && !isViewingHistory && (
                 <p className="text-xs text-muted-foreground px-1 italic">{activeCommit.message}</p>
               )}
 
@@ -523,6 +523,9 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       Adopt this version
                     </Button>
                   </div>
+                  {activeCommit?.message && (
+                    <p className="text-xs text-muted-foreground italic">{activeCommit.message}</p>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
