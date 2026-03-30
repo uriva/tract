@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { displayName } from "@/lib/utils";
 
 interface Commit {
   id: string;
@@ -260,7 +261,7 @@ export function CommitLog({
             const isHead = commit.id === headCommitId;
             const isViewing = commit.id === viewingCommitId;
             const isTract = !commit.author;
-            const authorLabel = isTract ? "Tract" : (commit.author?.email?.split("@")[0] ?? "unknown");
+            const authorLabel = isTract ? "Tract" : displayName(commit.author?.email, commit.author?.id);
             const onThisCommit = commitParticipants.get(commit.id) ?? [];
 
             return (
@@ -288,7 +289,7 @@ export function CommitLog({
                   {/* Participant markers */}
                   {onThisCommit.map((p, i) => {
                     const isMe = p.user?.id === currentUserId;
-                    const label = isMe ? "You" : (p.email.split("@")[0]);
+                    const label = isMe ? "You" : displayName(p.email, p.user?.id);
                     return (
                       <span
                         key={p.id}

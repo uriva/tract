@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
 import { DiffViewer } from "@/components/diff-viewer";
+import { displayName } from "@/lib/utils";
 
 function CompareView({
   contractId,
@@ -55,8 +56,8 @@ function CompareView({
     const newCommitId = id();
     const message =
       approvedCount === totalCount
-        ? `Accept all changes from ${theirParticipant?.email?.split("@")[0]}`
-        : `Accept ${approvedCount}/${totalCount} changes from ${theirParticipant?.email?.split("@")[0]}`;
+        ? `Accept all changes from ${displayName(theirParticipant?.email, theirParticipant?.user?.id)}`
+        : `Accept ${approvedCount}/${totalCount} changes from ${displayName(theirParticipant?.email, theirParticipant?.user?.id)}`;
 
     await db.transact([
       db.tx.commits[newCommitId]
@@ -120,7 +121,7 @@ function CompareView({
           </Button>
           <h1 className="text-xl font-semibold tracking-tight">Compare changes</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Your version vs. {theirParticipant.email.split("@")[0]}&apos;s version
+            Your version vs. {displayName(theirParticipant.email, theirParticipant.user?.id)}&apos;s version
           </p>
         </div>
       </div>
@@ -134,7 +135,7 @@ function CompareView({
         </div>
         <div className="p-3 rounded-lg border border-border bg-card">
           <div className="text-xs text-muted-foreground">
-            {theirParticipant.email.split("@")[0]}&apos;s version
+            {displayName(theirParticipant.email, theirParticipant.user?.id)}&apos;s version
           </div>
           <div className="text-xs font-mono mt-1">{theirHead.id.slice(0, 7)}</div>
           <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
@@ -145,7 +146,7 @@ function CompareView({
       <DiffViewer
         myContent={myHead.content}
         theirContent={theirHead.content}
-        theirEmail={theirParticipant.email.split("@")[0]}
+        theirEmail={displayName(theirParticipant.email, theirParticipant.user?.id)}
         onApprove={handleApprove}
         applying={applying}
       />

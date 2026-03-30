@@ -74,6 +74,32 @@ export function LoginForm() {
           <Button type="submit" className="w-full" disabled={sending}>
             {sending ? "Sending..." : "Continue with email"}
           </Button>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={sending}
+            onClick={async () => {
+              setSending(true);
+              try {
+                await db.auth.signInAsGuest();
+              } catch {
+                setError("Failed to sign in as guest.");
+              } finally {
+                setSending(false);
+              }
+            }}
+          >
+            Try as guest
+          </Button>
         </form>
       ) : (
         <form onSubmit={handleVerifyCode} className="space-y-4">

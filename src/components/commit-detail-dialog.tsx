@@ -9,6 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { InlineDiffView } from "@/components/inline-diff-view";
+import { displayName } from "@/lib/utils";
 
 interface Commit {
   id: string;
@@ -37,7 +38,7 @@ export function CommitDetailDialog({
   const isTract = !commit.author;
   const authorLabel = isTract
     ? "Tract"
-    : (commit.author?.email?.split("@")[0] ?? "unknown");
+    : displayName(commit.author?.email, commit.author?.id);
 
   const date = new Date(commit.createdAt);
   const dateStr = date.toLocaleString(undefined, {

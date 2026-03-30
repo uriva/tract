@@ -18,6 +18,7 @@ import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
 import { InlineDiffView } from "@/components/inline-diff-view";
 import { CommitDetailDialog } from "@/components/commit-detail-dialog";
+import { displayName } from "@/lib/utils";
 
 type Mode = "view" | "edit";
 
@@ -223,7 +224,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   // Tract AI: background generation + commit
   async function handleTractSubmit(prompt: string) {
     if (!myParticipant || !myHeadCommitId) return;
-    const requesterName = user?.email?.split("@")[0] ?? "unknown";
+    const requesterName = displayName(user?.email, user?.id);
     const baseContent = headCommit?.content ?? "";
 
     setTractStatus({ state: "working", prompt });
@@ -486,7 +487,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     <p className="text-sm text-muted-foreground">
                       Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
                       {activeCommit?.author?.email
-                        ? ` by ${activeCommit.author.email.split("@")[0]}`
+                        ? ` by ${displayName(activeCommit.author.email)}`
                         : " by Tract"}
                     </p>
                     <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
@@ -511,7 +512,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                   <span className="inline-block w-2 h-2 rounded-full bg-green-500/80" />
                   {approvers.map((p) => {
                     const isMe = p.user?.id === user?.id;
-                    return isMe ? "You" : (p.email?.split("@")[0] ?? p.email);
+                    return isMe ? "You" : displayName(p.email, p.user?.id);
                   }).join(", ")}{" "}
                   {approvers.length === 1 ? "approves" : "approve"} this version
                   {approvers.length === participants.length && participants.length >= 2 && (
