@@ -19,6 +19,9 @@ const _schema = i.schema({
       headCommitId: i.string().optional(),
       email: i.string().indexed(),
       joinedAt: i.number().indexed(),
+      legalName: i.string().optional(),
+      signatureData: i.string().optional(), // base64 PNG from canvas
+      signedAt: i.number().optional(),
     }),
   },
   links: {

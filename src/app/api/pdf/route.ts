@@ -5,9 +5,14 @@ import { marked, type Token } from "marked";
 // Markdown tokens → pdfkit calls. No HTML, no CSS.
 export async function POST(req: NextRequest) {
   try {
-  const { title, content } = (await req.json()) as {
+  const { title, content, signature } = (await req.json()) as {
     title: string;
     content: string;
+    signature?: {
+      legalName: string;
+      signatureData: string; // base64 PNG data URL
+      signedAt: number;
+    };
   };
   if (!content) {
     return NextResponse.json({ error: "Missing content" }, { status: 400 });
@@ -276,6 +281,52 @@ export async function POST(req: NextRequest) {
   }
 
   renderTokens(tokens);
+
+  // Signature block
+  if (signature) {
+    doc.moveDown(2);
+
+    // Horizontal rule
+    const sigRuleY = doc.y;
+    doc
+      .strokeColor("#d1d5db")
+      .lineWidth(0.5)
+      .moveTo(60, sigRuleY)
+      .lineTo(535, sigRuleY)
+      .stroke();
+    doc.moveDown(0.8);
+
+    // Signature image
+    if (signature.signatureData.startsWith("data:image/png;base64,")) {
+      const base64 = signature.signatureData.replace(/^data:image\/png;base64,/, "");
+      const imgBuf = Buffer.from(base64, "base64");
+      doc.image(imgBuf, 60, doc.y, { width: 200, height: 80 });
+      doc.moveDown(0.3);
+      // Move below the image
+      doc.y += 80;
+    }
+
+    // Name line
+    doc
+      .font(FONT_BOLD)
+      .fontSize(12)
+      .fillColor(COLOR_TEXT)
+      .text(signature.legalName, 60, undefined, { width: 475 });
+    doc.moveDown(0.15);
+
+    // Date
+    const signedDate = new Date(signature.signedAt).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    doc
+      .font(FONT_REGULAR)
+      .fontSize(10)
+      .fillColor(COLOR_MUTED)
+      .text(signedDate, 60, undefined, { width: 475 });
+  }
+
   doc.end();
 
   const buf = await new Promise<Buffer>((resolve) => {

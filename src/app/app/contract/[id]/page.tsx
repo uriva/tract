@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, use } from "react";
+import { useState, useCallback, useMemo, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
@@ -18,6 +18,7 @@ import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
 import { InlineDiffView } from "@/components/inline-diff-view";
 import { CommitDetailDialog } from "@/components/commit-detail-dialog";
+import { SignDialog } from "@/components/sign-dialog";
 import { displayName, assignParticipantColors } from "@/lib/utils";
 
 type Mode = "view" | "edit";
@@ -28,6 +29,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [tractOpen, setTractOpen] = useState(false);
   const [commitDetailOpen, setCommitDetailOpen] = useState(false);
+  const [signOpen, setSignOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -198,30 +200,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
     setEditingName(false);
   }
 
-  async function handleDownloadPdf() {
-    if (!contract) return;
-    setDownloading(true);
-    try {
-      const res = await fetch("/api/pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: contract.name, content: displayContent }),
-      });
-      if (!res.ok) throw new Error("PDF generation failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${contract.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error("PDF download failed:", e);
-    } finally {
-      setDownloading(false);
-    }
-  }
-
   // Tract AI: background generation + commit
   async function handleTractSubmit(prompt: string) {
     if (!myParticipant || !myHeadCommitId) return;
@@ -271,6 +249,66 @@ function ContractEditor({ contractId }: { contractId: string }) {
         error: e instanceof Error ? e.message : "Something went wrong",
       });
     }
+  }
+
+  // Sign this contract (save legal name + drawn signature for PDF)
+  async function handleSign(legalName: string, signatureData: string) {
+    if (!myParticipant) return;
+    await db.transact([
+      db.tx.participants[myParticipant.id].update({
+        legalName,
+        signatureData,
+        signedAt: Date.now(),
+      }),
+    ]);
+    // If we were waiting to download, do it now
+    if (pendingDownload.current) {
+      pendingDownload.current = false;
+      downloadPdf(legalName, signatureData);
+    }
+  }
+
+  const pendingDownload = useRef(false);
+
+  function downloadPdf(legalName?: string, signatureData?: string) {
+    if (!contract) return;
+    setDownloading(true);
+    const sigName = legalName ?? myParticipant?.legalName;
+    const sigData = signatureData ?? myParticipant?.signatureData;
+    fetch("/api/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: contract.name,
+        content: displayContent,
+        signature: sigName && sigData ? { legalName: sigName, signatureData: sigData, signedAt: myParticipant?.signedAt ?? Date.now() } : undefined,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("PDF generation failed");
+        return res.blob();
+      })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${contract!.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch((e) => console.error("PDF download failed:", e))
+      .finally(() => setDownloading(false));
+  }
+
+  async function handleDownloadPdf() {
+    if (!contract) return;
+    // If no signature saved yet, prompt to draw one first
+    if (!myParticipant?.signatureData) {
+      pendingDownload.current = true;
+      setSignOpen(true);
+      return;
+    }
+    downloadPdf();
   }
 
   if (isLoading) {
@@ -603,6 +641,13 @@ function ContractEditor({ contractId }: { contractId: string }) {
         parentCommit={activeParentCommit}
         open={commitDetailOpen}
         onOpenChange={setCommitDetailOpen}
+      />
+
+      <SignDialog
+        open={signOpen}
+        onOpenChange={setSignOpen}
+        onSign={handleSign}
+        existingName={myParticipant?.legalName ?? undefined}
       />
     </div>
   );
