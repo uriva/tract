@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
 import { ParticipantList } from "@/components/participant-list";
@@ -54,6 +55,16 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const activeCommitId = viewingCommitId ?? myHeadCommitId;
   const activeCommit = commits.find((c) => c.id === activeCommitId);
   const isViewingHistory = viewingCommitId !== null && viewingCommitId !== myHeadCommitId;
+
+  // Consensus: all participants point to the same commit
+  const headIds = participants.map((p) => p.headCommitId).filter(Boolean);
+  const allInConsensus =
+    participants.length >= 2 &&
+    headIds.length === participants.length &&
+    new Set(headIds).size === 1;
+
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
 
   const [content, setContent] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
@@ -139,6 +150,18 @@ function ContractEditor({ contractId }: { contractId: string }) {
     setMode("view");
   }, [hasChanges, user, myParticipant, content, commitMsg, contractId, myHeadCommitId]);
 
+  async function handleNameSave() {
+    const trimmed = nameValue.trim();
+    if (!trimmed || !contract || trimmed === contract.name) {
+      setEditingName(false);
+      return;
+    }
+    await db.transact([
+      db.tx.contracts[contract.id].update({ name: trimmed }),
+    ]);
+    setEditingName(false);
+  }
+
   if (isLoading || !contract) {
     return <div className="text-sm text-muted-foreground">Loading...</div>;
   }
@@ -165,12 +188,47 @@ function ContractEditor({ contractId }: { contractId: string }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">{contract.name}</h1>
-          <p className="text-xs text-muted-foreground mt-1 font-mono">
-            {isViewingHistory
-              ? `Viewing: ${activeCommitId?.slice(0, 7)} (not your HEAD)`
-              : `HEAD: ${myHeadCommitId?.slice(0, 7) ?? "none"}`}
-          </p>
+          {editingName ? (
+            <input
+              className="text-xl font-semibold tracking-tight bg-transparent border-b border-accent outline-none w-full"
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onBlur={handleNameSave}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleNameSave();
+                if (e.key === "Escape") setEditingName(false);
+              }}
+              autoFocus
+            />
+          ) : (
+            <h1
+              className="text-xl font-semibold tracking-tight cursor-pointer hover:text-accent transition-colors"
+              onClick={() => {
+                setNameValue(contract.name);
+                setEditingName(true);
+              }}
+              title="Click to rename"
+            >
+              {contract.name}
+            </h1>
+          )}
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-xs text-muted-foreground font-mono">
+              {isViewingHistory
+                ? `Viewing: ${activeCommitId?.slice(0, 7)} (not your HEAD)`
+                : `HEAD: ${myHeadCommitId?.slice(0, 7) ?? "none"}`}
+            </p>
+            {participants.length >= 2 && (
+              <Badge
+                variant={allInConsensus ? "default" : "secondary"}
+                className={`text-[10px] ${allInConsensus ? "bg-green-600/90 text-white" : ""}`}
+              >
+                {allInConsensus
+                  ? "Consensus"
+                  : `${new Set(headIds).size} version${new Set(headIds).size !== 1 ? "s" : ""}`}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {mode === "view" && !isViewingHistory && (
