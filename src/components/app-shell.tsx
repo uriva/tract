@@ -26,6 +26,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
 
           <div className="flex items-center gap-2">
+            <a href="mailto:uri.valevski@gmail.com?subject=Tract%20Support">
+              <Button variant="ghost" size="sm" className="text-sm font-normal text-muted-foreground">
+                Support
+              </Button>
+            </a>
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger
