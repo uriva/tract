@@ -8,7 +8,7 @@ export default {
       // Only participants can update (e.g. rename)
       update: "auth.id in data.ref('participants.user.id')",
       // Only the owner can delete
-      delete: "auth.id == data.ref('owner.id')",
+      delete: "auth.id in data.ref('owner.id')",
     },
   },
   commits: {
@@ -28,8 +28,8 @@ export default {
       view: "auth.id in data.ref('contract.participants.user.id')",
       // Any authenticated user (needed for invite flow)
       create: "auth.id != null",
-      // Only the participant themselves can update (e.g. move HEAD)
-      update: "auth.id == data.ref('user.id')",
+      // Participants of the same contract can update (e.g. move version pointer)
+      update: "auth.id in data.ref('contract.participants.user.id')",
       // Only the contract owner can remove participants
       delete: "auth.id in data.ref('contract.owner.id')",
     },
