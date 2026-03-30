@@ -49,13 +49,15 @@ export function CommitLog({
     [layout],
   );
 
-  // Map commitId → participant color (only for head commits)
-  const commitColorMap = useMemo(() => {
-    const map = new Map<string, string>();
+  // Map commitId → participant colors (only for head commits)
+  const commitColorsMap = useMemo(() => {
+    const map = new Map<string, string[]>();
     if (colorMap) {
       for (const p of participants) {
         if (p.headCommitId && colorMap.has(p.id)) {
-          map.set(p.headCommitId, colorMap.get(p.id)!);
+          const existing = map.get(p.headCommitId) ?? [];
+          existing.push(colorMap.get(p.id)!);
+          map.set(p.headCommitId, existing);
         }
       }
     }
@@ -138,17 +140,53 @@ export function CommitLog({
 
             {/* Dots */}
             {layout.map((node) => {
-              const headColor = commitColorMap.get(node.commit.id);
+              const colors = commitColorsMap.get(node.commit.id);
               const cx = laneX(node.lane);
               const cy = node.row * ROW_H + ROW_H / 2;
+              const r = colors?.length ? DOT_R + 1 : DOT_R;
+
+              if (colors && colors.length > 1) {
+                // Multi-color split dot: one pie slice per participant
+                const sliceAngle = (2 * Math.PI) / colors.length;
+                return (
+                  <g key={`${node.commit.id}-dot`}>
+                    {colors.map((color, i) => {
+                      const startAngle = i * sliceAngle - Math.PI / 2;
+                      const endAngle = (i + 1) * sliceAngle - Math.PI / 2;
+                      const x1 = cx + r * Math.cos(startAngle);
+                      const y1 = cy + r * Math.sin(startAngle);
+                      const x2 = cx + r * Math.cos(endAngle);
+                      const y2 = cy + r * Math.sin(endAngle);
+                      const largeArc = sliceAngle > Math.PI ? 1 : 0;
+                      return (
+                        <path
+                          key={i}
+                          d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                          fill={color}
+                          stroke="var(--color-background)"
+                          strokeWidth={1}
+                        />
+                      );
+                    })}
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={r}
+                      fill="none"
+                      stroke="var(--color-background)"
+                      strokeWidth={2}
+                    />
+                  </g>
+                );
+              }
 
               return (
                 <circle
                   key={`${node.commit.id}-dot`}
                   cx={cx}
                   cy={cy}
-                  r={headColor ? DOT_R + 1 : DOT_R}
-                  fill={headColor ?? "var(--color-muted-foreground)"}
+                  r={r}
+                  fill={colors?.[0] ?? "var(--color-muted-foreground)"}
                   stroke="var(--color-background)"
                   strokeWidth={2}
                 />
