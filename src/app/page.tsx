@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import db from "@/lib/instant";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,12 @@ export default function HomePage() {
   const router = useRouter();
   const [showLogin, setShowLogin] = useState(false);
 
-  // If already signed in and they land on /, let them go to /app via button
-  // but always show the landing page
+  // When user logs in from the landing page dialog, navigate to the app
+  useEffect(() => {
+    if (user && showLogin) {
+      router.push("/app");
+    }
+  }, [user, showLogin, router]);
 
   return (
     <div className="flex flex-col min-h-screen">

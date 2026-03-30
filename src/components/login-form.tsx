@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import db from "@/lib/instant";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,13 +17,6 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -47,15 +40,7 @@ export function LoginForm() {
       await db.auth.signInWithMagicCode({ email, code });
     } catch (err) {
       console.error("[tract] magic code verification failed", err);
-      // signInWithMagicCode can update auth state (logging the user in)
-      // but still throw during post-auth cleanup. When that happens,
-      // AuthGate will unmount this component on the next React render.
-      // We defer the error so React can process the auth state change
-      // first — if we're still mounted after that, it's a real error.
-      await new Promise((r) => setTimeout(r, 100));
-      if (mountedRef.current) {
-        setError("Invalid code. Please try again.");
-      }
+      setError("Invalid code. Please try again.");
     } finally {
       setSending(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import posthog from "posthog-js";
 import db from "@/lib/instant";
 import { LoginForm } from "@/components/login-form";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -24,6 +25,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         body,
       }).catch(() => {});
     }
+    // Identify user in PostHog
+    posthog.identify(user.id, {
+      email: user.email ?? undefined,
+    });
     // Seed example contract for all users (guests included)
     fetch("/api/seed-example", {
       method: "POST",
