@@ -243,14 +243,9 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 ? `Viewing: ${activeCommitId?.slice(0, 7)} (not your current version)`
                 : `Your version: ${myHeadCommitId?.slice(0, 7) ?? "none"}`}
             </p>
-            {participants.length >= 2 && (
-              <Badge
-                variant={allInConsensus ? "default" : "secondary"}
-                className={`text-[10px] ${allInConsensus ? "bg-green-600/90 text-white" : ""}`}
-              >
-                {allInConsensus
-                  ? "Consensus"
-                  : `${new Set(headIds).size} version${new Set(headIds).size !== 1 ? "s" : ""}`}
+            {participants.length >= 2 && !allInConsensus && (
+              <Badge variant="secondary" className="text-[10px]">
+                {`${new Set(headIds).size} version${new Set(headIds).size !== 1 ? "s" : ""}`}
               </Badge>
             )}
           </div>
