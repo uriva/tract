@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, use } from "react";
+import { useState, useCallback, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
@@ -28,6 +28,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [tractOpen, setTractOpen] = useState(false);
   const [commitDetailOpen, setCommitDetailOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const pdfContentRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [commitError, setCommitError] = useState("");
   const [mode, setMode] = useState<Mode>("view");
@@ -66,12 +68,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const isViewingHistory = viewingCommitId !== null && viewingCommitId !== myHeadCommitId;
 
   // Consensus: all participants point to the same commit
-  const headIds = participants.map((p) => p.headCommitId).filter(Boolean);
-  const allInConsensus =
-    participants.length >= 2 &&
-    headIds.length === participants.length &&
-    new Set(headIds).size === 1;
-
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
 
@@ -195,6 +191,27 @@ function ContractEditor({ contractId }: { contractId: string }) {
     setEditingName(false);
   }
 
+  async function handleDownloadPdf() {
+    if (!pdfContentRef.current || !contract) return;
+    setDownloading(true);
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
+      await html2pdf()
+        .set({
+          margin: [12, 16],
+          filename: `${contract.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`,
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(pdfContentRef.current)
+        .save();
+    } catch (e) {
+      console.error("PDF download failed:", e);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   // Tract AI creates a commit parented on the user's current version
   async function handleTractCommit(newContent: string, message: string) {
     if (!myParticipant || !myHeadCommitId) return;
@@ -268,18 +285,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
               {contract.name}
             </h1>
           )}
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-xs text-muted-foreground font-mono">
-              {isViewingHistory
-                ? `Viewing: ${activeCommitId?.slice(0, 7)} (not your current version)`
-                : `Your version: ${myHeadCommitId?.slice(0, 7) ?? "none"}`}
-            </p>
-            {participants.length >= 2 && !allInConsensus && (
-              <Badge variant="secondary" className="text-[10px]">
-                {`${new Set(headIds).size} version${new Set(headIds).size !== 1 ? "s" : ""}`}
-              </Badge>
-            )}
-          </div>
+          <p className="text-xs text-muted-foreground font-mono mt-1">
+            {isViewingHistory
+              ? `Viewing: ${activeCommitId?.slice(0, 7)} (not your current version)`
+              : `Your version: ${myHeadCommitId?.slice(0, 7) ?? "none"}`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {mode === "view" && !isViewingHistory && (
@@ -313,6 +323,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
           )}
           <Button variant="outline" size="sm" onClick={() => setTractOpen(true)}>
             Ask Tract
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadPdf}
+            disabled={downloading || !displayContent.trim()}
+          >
+            {downloading ? "Generating..." : "Download PDF"}
           </Button>
           <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
             Invite
@@ -414,6 +432,28 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 ) : (
                   <MarkdownView content={displayContent} />
                 )}
+              </div>
+
+              {/* Hidden container for PDF rendering */}
+              <div style={{ position: "fixed", left: "-9999px", top: 0 }} aria-hidden>
+                <div
+                  ref={pdfContentRef}
+                  style={{
+                    padding: "32px",
+                    background: "white",
+                    color: "#1a1a1a",
+                    fontSize: "14px",
+                    lineHeight: "1.7",
+                    maxWidth: "210mm",
+                    width: "210mm",
+                    fontFamily: "system-ui, -apple-system, sans-serif",
+                  }}
+                >
+                  <h1 style={{ marginBottom: "8px", fontSize: "22px", fontWeight: 600 }}>
+                    {contract.name}
+                  </h1>
+                  <MarkdownView content={displayContent} />
+                </div>
               </div>
             </div>
           )}
