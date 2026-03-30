@@ -266,7 +266,26 @@ function ContractEditor({ contractId }: { contractId: string }) {
         .set({
           margin: [12, 16],
           filename: `${contract.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`,
-          html2canvas: { scale: 2 },
+          html2canvas: {
+            scale: 2,
+            onclone: (clonedDoc: Document) => {
+              // Strip stylesheet rules that use oklch()/lab() — html2canvas can't parse them
+              for (const sheet of Array.from(clonedDoc.styleSheets)) {
+                try {
+                  const rules = sheet.cssRules;
+                  for (let i = rules.length - 1; i >= 0; i--) {
+                    const text = rules[i].cssText;
+                    if (text.includes("oklch(") || text.includes("lab(")) {
+                      sheet.deleteRule(i);
+                    }
+                  }
+                } catch {
+                  // Cross-origin sheets — remove entirely
+                  sheet.ownerNode?.parentNode?.removeChild(sheet.ownerNode);
+                }
+              }
+            },
+          },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         })
         .from(wrapper)
