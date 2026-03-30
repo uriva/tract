@@ -480,32 +480,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
             </>
           ) : (
             <div className="space-y-3">
-              {/* Adopt bar — shown when viewing a historical commit */}
-              {isViewingHistory && (
-                <div className="space-y-2 p-3 rounded-lg border border-accent/30 bg-accent/5">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
-                      {activeCommit?.author?.email
-                        ? <> by <span title={activeCommit.author.email}>{displayName(activeCommit.author.email)}</span></>
-                        : " by Tract"}
-                    </p>
-                    <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
-                      Adopt this version
-                    </Button>
-                  </div>
-                  <p className="text-sm">{activeCommit?.message}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => setCommitDetailOpen(true)}
-                  >
-                    View changes from parent
-                  </Button>
-                </div>
-              )}
-
               {/* Approval indicator */}
               {approvers.length > 0 && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
@@ -527,6 +501,36 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       🎉 Consensus
                     </Badge>
                   )}
+                </div>
+              )}
+
+              {/* Last commit note */}
+              {activeCommit?.message && (
+                <p className="text-xs text-muted-foreground px-1 italic">{activeCommit.message}</p>
+              )}
+
+              {/* Adopt bar — shown when viewing a historical commit */}
+              {isViewingHistory && (
+                <div className="space-y-2 p-3 rounded-lg border border-accent/30 bg-accent/5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
+                      {activeCommit?.author?.email
+                        ? <> by <span title={activeCommit.author.email}>{displayName(activeCommit.author.email)}</span></>
+                        : " by Tract"}
+                    </p>
+                    <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
+                      Adopt this version
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setCommitDetailOpen(true)}
+                  >
+                    View changes from parent
+                  </Button>
                 </div>
               )}
 
