@@ -12,19 +12,23 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   // On login, claim any participant records matching this user's email
   // and seed an example contract if they don't have one
   useEffect(() => {
-    if (!user?.id || !user?.email || claimedRef.current) return;
+    if (!user?.id || claimedRef.current) return;
     claimedRef.current = true;
-    const body = JSON.stringify({ userId: user.id, email: user.email });
     const headers = { "Content-Type": "application/json" };
-    fetch("/api/claim-participant", {
-      method: "POST",
-      headers,
-      body,
-    }).catch(() => {});
+    // Claim participant records (only meaningful for email users)
+    if (user.email) {
+      const body = JSON.stringify({ userId: user.id, email: user.email });
+      fetch("/api/claim-participant", {
+        method: "POST",
+        headers,
+        body,
+      }).catch(() => {});
+    }
+    // Seed example contract for all users (guests included)
     fetch("/api/seed-example", {
       method: "POST",
       headers,
-      body,
+      body: JSON.stringify({ userId: user.id, email: user.email ?? "" }),
     }).catch(() => {});
   }, [user?.id, user?.email]);
 

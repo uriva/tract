@@ -130,8 +130,8 @@ Either party may terminate this agreement with **7 days** written notice. If ter
 export async function POST(req: Request) {
   const { userId, email } = await req.json();
 
-  if (!userId || !email) {
-    return Response.json({ error: "Missing userId or email" }, { status: 400 });
+  if (!userId) {
+    return Response.json({ error: "Missing userId" }, { status: 400 });
   }
 
   // Check if user already has an example contract (by checking participants)
@@ -224,7 +224,7 @@ export async function POST(req: Request) {
       .update({
         role: "collaborator",
         headCommitId: commit1,
-        email: email.toLowerCase(),
+        email: (email || `guest-${userId.slice(0, 8)}`).toLowerCase(),
         joinedAt: now,
       })
       .link({ contract: contractId })
