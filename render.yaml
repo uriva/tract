@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: tract
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_INSTANT_APP_ID
+        value: ee728169-50d6-47c1-9907-d2fed63f60d1
+      - key: INSTANT_ADMIN_TOKEN
+        sync: false
