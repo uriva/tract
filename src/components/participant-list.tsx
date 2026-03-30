@@ -121,8 +121,8 @@ export function ParticipantList({
 
             {status === "diverged" && (
               <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
-                <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap">
-                  diverged
+                <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10">
+                  resolve conflicts
                 </Button>
               </Link>
             )}

@@ -510,17 +510,18 @@ function ContractEditor({ contractId }: { contractId: string }) {
               {approvers.length > 0 && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-green-500/80" />
+                  This is{" "}
                   {approvers.map((p, i) => {
                     const isMe = p.user?.id === user?.id;
-                    const label = isMe ? "You" : displayName(p.email, p.user?.id);
+                    const label = isMe ? "your" : `${displayName(p.email, p.user?.id)}'s`;
                     return (
                       <span key={p.id}>
-                        {i > 0 && ", "}
+                        {i > 0 && (i === approvers.length - 1 ? " and " : ", ")}
                         <span title={p.email || undefined}>{label}</span>
                       </span>
                     );
                   })}{" "}
-                  {approvers.length === 1 ? "approves" : "approve"} this version
+                  version
                   {approvers.length === participants.length && participants.length >= 2 && (
                     <Badge variant="default" className="text-[10px] bg-green-600/90 text-white ml-1">
                       Consensus
