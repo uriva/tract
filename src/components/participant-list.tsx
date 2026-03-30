@@ -70,13 +70,13 @@ export function ParticipantList({
             {hasDivergence && (
               <Link href={`/contract/${contractId}/compare/${p.id}`}>
                 <Button variant="outline" size="sm" className="text-xs h-7">
-                  View diff
+                  has notes
                 </Button>
               </Link>
             )}
 
             {!hasDivergence && theirHead && (
-              <span className="text-[10px] text-muted-foreground">in sync</span>
+              <span className="text-[10px] text-muted-foreground">in agreement</span>
             )}
           </div>
         );
