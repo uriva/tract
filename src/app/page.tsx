@@ -6,6 +6,7 @@ import db from "@/lib/instant";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LoginForm } from "@/components/login-form";
+import { CommitAnimation } from "@/components/commit-animation";
 
 export default function HomePage() {
   const { user } = db.useAuth();
@@ -39,27 +40,32 @@ export default function HomePage() {
       <main className="flex-1">
         {/* Hero */}
         <section className="max-w-5xl mx-auto px-6 pt-24 pb-20">
-          <div className="max-w-2xl space-y-6 page-enter">
-            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.1]">
-              Contracts that track
-              <br />
-              every change.
-            </h1>
-            <p className="text-lg text-muted-foreground leading-relaxed max-w-lg">
-              Tract brings version control to contract negotiation. Every edit
-              is a commit. Every participant has their own version. Approve
-              changes line by line until everyone agrees.
-            </p>
-            <div className="flex items-center gap-3 pt-2">
-              {user ? (
-                <Button size="lg" onClick={() => router.push("/app")}>
-                  Go to app
-                </Button>
-              ) : (
-                <Button size="lg" onClick={() => setShowLogin(true)}>
-                  Get started
-                </Button>
-              )}
+          <div className="grid md:grid-cols-[1fr_auto] gap-12 items-center">
+            <div className="max-w-lg space-y-6 page-enter">
+              <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.1]">
+                Contracts that track
+                <br />
+                every change.
+              </h1>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                Tract brings version control to contract negotiation. Every edit
+                is a commit. Every participant has their own version. Approve
+                changes line by line until everyone agrees.
+              </p>
+              <div className="flex items-center gap-3 pt-2">
+                {user ? (
+                  <Button size="lg" onClick={() => router.push("/app")}>
+                    Go to app
+                  </Button>
+                ) : (
+                  <Button size="lg" onClick={() => setShowLogin(true)}>
+                    Get started
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="hidden md:block page-enter" style={{ animationDelay: "0.15s" }}>
+              <CommitAnimation />
             </div>
           </div>
         </section>
