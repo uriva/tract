@@ -358,8 +358,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="space-y-3">
+        <div className="min-w-0">
           {editingName ? (
             <input
               className="text-xl font-semibold tracking-tight bg-transparent border-b border-accent outline-none w-full"
@@ -374,7 +374,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
             />
           ) : (
             <h1
-              className="text-xl font-semibold tracking-tight cursor-pointer hover:text-accent transition-colors"
+              className="text-xl font-semibold tracking-tight cursor-pointer hover:text-accent transition-colors truncate"
               onClick={() => {
                 setNameValue(contract.name);
                 setEditingName(true);
@@ -390,7 +390,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
               : `Your version: ${myHeadCommitId?.slice(0, 7) ?? "none"}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {mode === "view" && !isViewingHistory && (
             <Button size="sm" variant="outline" onClick={enterEditMode}>
               Edit
