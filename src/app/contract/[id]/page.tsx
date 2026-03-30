@@ -34,6 +34,12 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [commitError, setCommitError] = useState("");
   const [mode, setMode] = useState<Mode>("view");
   const [viewingCommitId, setViewingCommitId] = useState<string | null>(null);
+  const [tractStatus, setTractStatus] = useState<
+    | { state: "working"; prompt: string }
+    | { state: "done"; prompt: string }
+    | { state: "error"; prompt: string; error: string }
+    | null
+  >(null);
 
   const { data, isLoading } = db.useQuery({
     contracts: {
@@ -212,22 +218,54 @@ function ContractEditor({ contractId }: { contractId: string }) {
     }
   }
 
-  // Tract AI creates a commit parented on the user's current version
-  async function handleTractCommit(newContent: string, message: string) {
+  // Tract AI: background generation + commit
+  async function handleTractSubmit(prompt: string) {
     if (!myParticipant || !myHeadCommitId) return;
-    const newCommitId = id();
-    await db.transact([
-      db.tx.commits[newCommitId]
-        .update({
-          content: newContent,
-          message,
-          createdAt: Date.now(),
-        })
-        .link({ contract: contractId })
-        .link({ parent: myHeadCommitId }),
-    ]);
-    // Don't move anyone's pointer — Tract has no version.
-    // The commit just exists in the DAG for anyone to adopt.
+    const requesterName = user?.email?.split("@")[0] ?? "unknown";
+    const baseContent = headCommit?.content ?? "";
+
+    setTractStatus({ state: "working", prompt });
+
+    try {
+      const res = await fetch("/api/tract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: baseContent,
+          prompt,
+          contractName: contract!.name,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to generate");
+      }
+
+      const data = await res.json();
+      const fullMsg = `${data.message}\n\nWritten as per ${requesterName}'s request: "${prompt}"`;
+
+      const newCommitId = id();
+      await db.transact([
+        db.tx.commits[newCommitId]
+          .update({
+            content: data.content,
+            message: fullMsg,
+            createdAt: Date.now(),
+          })
+          .link({ contract: contractId })
+          .link({ parent: myHeadCommitId }),
+      ]);
+
+      setTractStatus({ state: "done", prompt });
+      setTimeout(() => setTractStatus(null), 4000);
+    } catch (e) {
+      setTractStatus({
+        state: "error",
+        prompt,
+        error: e instanceof Error ? e.message : "Something went wrong",
+      });
+    }
   }
 
   if (isLoading || !contract) {
@@ -321,7 +359,12 @@ function ContractEditor({ contractId }: { contractId: string }) {
               Back to your version
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setTractOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTractOpen(true)}
+            disabled={tractStatus?.state === "working"}
+          >
             Ask Tract
           </Button>
           <Button
@@ -341,6 +384,59 @@ function ContractEditor({ contractId }: { contractId: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8">
         {/* Main content area */}
         <div className="space-y-4">
+          {/* Tract AI status banner */}
+          {tractStatus && (
+            <div
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm transition-opacity ${
+                tractStatus.state === "working"
+                  ? "border-accent/30 bg-accent/5"
+                  : tractStatus.state === "done"
+                    ? "border-green-500/30 bg-green-500/5"
+                    : "border-red-500/30 bg-red-500/5"
+              }`}
+            >
+              <span
+                className="inline-flex items-center justify-center w-5 h-5 shrink-0 rounded text-[10px] font-bold"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
+                  color: "white",
+                }}
+              >
+                T
+              </span>
+              <div className="flex-1 min-w-0">
+                {tractStatus.state === "working" && (
+                  <p className="text-muted-foreground">
+                    Tract is working on your request:{" "}
+                    <span className="text-foreground">&ldquo;{tractStatus.prompt}&rdquo;</span>
+                  </p>
+                )}
+                {tractStatus.state === "done" && (
+                  <p className="text-green-600 dark:text-green-400">
+                    Tract finished &mdash; new version available in the commit history
+                  </p>
+                )}
+                {tractStatus.state === "error" && (
+                  <div>
+                    <p className="text-red-600 dark:text-red-400">
+                      Tract failed: {tractStatus.error}
+                    </p>
+                    <button
+                      className="text-xs text-muted-foreground underline mt-1"
+                      onClick={() => setTractStatus(null)}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+              </div>
+              {tractStatus.state === "working" && (
+                <div className="shrink-0 w-4 h-4 border-2 border-accent/40 border-t-accent rounded-full animate-spin" />
+              )}
+            </div>
+          )}
+
           {mode === "edit" ? (
             <>
               <Textarea
@@ -492,10 +588,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
       <TractDialog
         open={tractOpen}
         onOpenChange={setTractOpen}
-        contractName={contract.name}
-        currentContent={headCommit?.content ?? ""}
-        requesterName={user?.email?.split("@")[0] ?? "unknown"}
-        onCommit={handleTractCommit}
+        onSubmit={handleTractSubmit}
       />
 
       <CommitDetailDialog
