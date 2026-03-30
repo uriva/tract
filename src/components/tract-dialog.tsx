@@ -15,6 +15,7 @@ interface TractDialogProps {
   onOpenChange: (open: boolean) => void;
   contractName: string;
   currentContent: string;
+  requesterName: string;
   onCommit: (content: string, message: string) => Promise<void>;
 }
 
@@ -23,6 +24,7 @@ export function TractDialog({
   onOpenChange,
   contractName,
   currentContent,
+  requesterName,
   onCommit,
 }: TractDialogProps) {
   const [prompt, setPrompt] = useState("");
@@ -66,8 +68,9 @@ export function TractDialog({
   async function handleAccept() {
     if (!preview) return;
     setLoading(true);
+    const fullMsg = `${commitMsg}\n\nWritten as per ${requesterName}'s request: "${prompt.trim()}"`;
     try {
-      await onCommit(preview, commitMsg);
+      await onCommit(preview, fullMsg);
       setPrompt("");
       setPreview(null);
       setCommitMsg("");

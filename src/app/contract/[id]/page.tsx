@@ -438,6 +438,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         onOpenChange={setTractOpen}
         contractName={contract.name}
         currentContent={headCommit?.content ?? ""}
+        requesterName={user?.email?.split("@")[0] ?? "unknown"}
         onCommit={handleTractCommit}
       />
     </div>

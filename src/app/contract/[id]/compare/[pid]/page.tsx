@@ -55,8 +55,8 @@ function CompareView({
     const newCommitId = id();
     const message =
       approvedCount === totalCount
-        ? `Accept all changes from ${theirParticipant?.email}`
-        : `Accept ${approvedCount}/${totalCount} changes from ${theirParticipant?.email}`;
+        ? `Accept all changes from ${theirParticipant?.email?.split("@")[0]}`
+        : `Accept ${approvedCount}/${totalCount} changes from ${theirParticipant?.email?.split("@")[0]}`;
 
     await db.transact([
       db.tx.commits[newCommitId]
@@ -120,7 +120,7 @@ function CompareView({
           </Button>
           <h1 className="text-xl font-semibold tracking-tight">Compare changes</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Your version vs. {theirParticipant.email}&apos;s version
+            Your version vs. {theirParticipant.email.split("@")[0]}&apos;s version
           </p>
         </div>
       </div>
@@ -134,7 +134,7 @@ function CompareView({
         </div>
         <div className="p-3 rounded-lg border border-border bg-card">
           <div className="text-xs text-muted-foreground">
-            {theirParticipant.email}&apos;s version
+            {theirParticipant.email.split("@")[0]}&apos;s version
           </div>
           <div className="text-xs font-mono mt-1">{theirHead.id.slice(0, 7)}</div>
           <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
@@ -145,7 +145,7 @@ function CompareView({
       <DiffViewer
         myContent={myHead.content}
         theirContent={theirHead.content}
-        theirEmail={theirParticipant.email}
+        theirEmail={theirParticipant.email.split("@")[0]}
         onApprove={handleApprove}
         applying={applying}
       />
