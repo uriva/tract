@@ -17,6 +17,7 @@ import { InviteDialog } from "@/components/invite-dialog";
 import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
 import { InlineDiffView } from "@/components/inline-diff-view";
+import { CommitDetailDialog } from "@/components/commit-detail-dialog";
 
 type Mode = "view" | "edit";
 
@@ -25,6 +26,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [tractOpen, setTractOpen] = useState(false);
+  const [commitDetailOpen, setCommitDetailOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [commitError, setCommitError] = useState("");
@@ -58,6 +60,9 @@ function ContractEditor({ contractId }: { contractId: string }) {
   // Which commit are we currently looking at?
   const activeCommitId = viewingCommitId ?? myHeadCommitId;
   const activeCommit = commits.find((c) => c.id === activeCommitId);
+  const activeParentCommit = activeCommit?.parent?.id
+    ? commits.find((c) => c.id === activeCommit.parent!.id) ?? null
+    : null;
   const isViewingHistory = viewingCommitId !== null && viewingCommitId !== myHeadCommitId;
 
   // Consensus: all participants point to the same commit
@@ -359,15 +364,26 @@ function ContractEditor({ contractId }: { contractId: string }) {
             <div className="space-y-3">
               {/* Adopt bar — shown when viewing a historical commit */}
               {isViewingHistory && (
-                <div className="flex items-center justify-between p-3 rounded-lg border border-accent/30 bg-accent/5">
-                  <p className="text-sm text-muted-foreground">
-                    Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
-                    {activeCommit?.author?.email
-                      ? ` by ${activeCommit.author.email.split("@")[0]}`
-                      : " by Tract"}
-                  </p>
-                  <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
-                    Adopt this version
+                <div className="space-y-2 p-3 rounded-lg border border-accent/30 bg-accent/5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
+                      {activeCommit?.author?.email
+                        ? ` by ${activeCommit.author.email.split("@")[0]}`
+                        : " by Tract"}
+                    </p>
+                    <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
+                      Adopt this version
+                    </Button>
+                  </div>
+                  <p className="text-sm">{activeCommit?.message}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setCommitDetailOpen(true)}
+                  >
+                    View changes from parent
                   </Button>
                 </div>
               )}
@@ -440,6 +456,13 @@ function ContractEditor({ contractId }: { contractId: string }) {
         currentContent={headCommit?.content ?? ""}
         requesterName={user?.email?.split("@")[0] ?? "unknown"}
         onCommit={handleTractCommit}
+      />
+
+      <CommitDetailDialog
+        commit={activeCommit ?? null}
+        parentCommit={activeParentCommit}
+        open={commitDetailOpen}
+        onOpenChange={setCommitDetailOpen}
       />
     </div>
   );

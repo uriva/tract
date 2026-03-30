@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { CommitDetailDialog } from "@/components/commit-detail-dialog";
 
 interface Commit {
   id: string;
@@ -131,15 +130,6 @@ export function CommitLog({
     () => Math.max(0, ...layout.map((n) => n.lane)),
     [layout],
   );
-
-  const [detailCommitId, setDetailCommitId] = useState<string | null>(null);
-
-  const detailCommit = detailCommitId
-    ? commits.find((c) => c.id === detailCommitId) ?? null
-    : null;
-  const detailParent = detailCommit?.parent?.id
-    ? commits.find((c) => c.id === detailCommit.parent!.id) ?? null
-    : null;
 
   // Map commitId → participants on that commit
   const commitParticipants = useMemo(() => {
@@ -291,14 +281,7 @@ export function CommitLog({
                     );
                   })}
                 </div>
-                <div
-                  className="mt-0.5 text-xs truncate hover:text-accent cursor-pointer"
-                  title="View details"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDetailCommitId(commit.id);
-                  }}
-                >
+                <div className="mt-0.5 text-xs truncate">
                   {commit.message}
                 </div>
                 <div className="mt-0.5 text-[10px] text-muted-foreground flex items-center gap-1">
@@ -321,15 +304,6 @@ export function CommitLog({
           })}
         </div>
       </ScrollArea>
-
-      <CommitDetailDialog
-        commit={detailCommit}
-        parentCommit={detailParent}
-        open={detailCommitId !== null}
-        onOpenChange={(open) => {
-          if (!open) setDetailCommitId(null);
-        }}
-      />
     </div>
   );
 }
