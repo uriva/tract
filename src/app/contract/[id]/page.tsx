@@ -16,6 +16,7 @@ import { CommitLog } from "@/components/commit-log";
 import { InviteDialog } from "@/components/invite-dialog";
 import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
+import { InlineDiffView } from "@/components/inline-diff-view";
 
 type Mode = "view" | "edit";
 
@@ -389,7 +390,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
               )}
 
               <div className="min-h-[500px] p-6 rounded-lg border border-border bg-card">
-                <MarkdownView content={displayContent} />
+                {isViewingHistory ? (
+                  <InlineDiffView
+                    baseContent={headCommit?.content ?? ""}
+                    compareContent={activeCommit?.content ?? ""}
+                  />
+                ) : (
+                  <MarkdownView content={displayContent} />
+                )}
               </div>
             </div>
           )}
