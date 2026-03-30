@@ -366,6 +366,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         <div className="space-y-6">
           <ParticipantList
             participants={participants}
+            commits={commits}
             currentUserId={user?.id ?? ""}
             contractId={contractId}
             myHeadCommitId={myHeadCommitId}

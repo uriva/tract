@@ -13,8 +13,14 @@ interface Participant {
   user?: { id: string; email?: string };
 }
 
+interface Commit {
+  id: string;
+  createdAt: number;
+}
+
 interface ParticipantListProps {
   participants: Participant[];
+  commits: Commit[];
   currentUserId: string;
   contractId: string;
   myHeadCommitId?: string;
@@ -22,6 +28,7 @@ interface ParticipantListProps {
 
 export function ParticipantList({
   participants,
+  commits,
   currentUserId,
   contractId,
   myHeadCommitId,
@@ -32,6 +39,11 @@ export function ParticipantList({
   const others = participants.filter(
     (p) => p.user?.id !== currentUserId
   );
+
+  const commitMap = new Map(commits.map((c) => [c.id, c]));
+  const myCommitTime = myHeadCommitId
+    ? commitMap.get(myHeadCommitId)?.createdAt ?? 0
+    : 0;
 
   return (
     <div className="space-y-3">
@@ -56,6 +68,10 @@ export function ParticipantList({
       {others.map((p) => {
         const theirHead = p.headCommitId;
         const hasDivergence = myHeadCommitId && theirHead && myHeadCommitId !== theirHead;
+        const theirCommitTime = theirHead
+          ? commitMap.get(theirHead)?.createdAt ?? 0
+          : 0;
+        const theyAreAhead = theirCommitTime > myCommitTime;
 
         return (
           <div key={p.id} className="flex items-center justify-between gap-2 py-1">
@@ -67,12 +83,16 @@ export function ParticipantList({
               </Badge>
             </div>
 
-            {hasDivergence && (
+            {hasDivergence && theyAreAhead && (
               <Link href={`/contract/${contractId}/compare/${p.id}`}>
-                <Button variant="outline" size="sm" className="text-xs h-7">
+                <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap">
                   has notes
                 </Button>
               </Link>
+            )}
+
+            {hasDivergence && !theyAreAhead && (
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">reviewing</span>
             )}
 
             {!hasDivergence && theirHead && (
