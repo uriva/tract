@@ -272,15 +272,15 @@ function ContractEditor({ contractId }: { contractId: string }) {
     }
   }
 
-  if (isLoading || !contract) {
+  if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading...</div>;
   }
 
-  if (!myParticipant) {
+  if (!contract || !myParticipant) {
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          You don&apos;t have access to this contract.
+          Contract not found, or you don&apos;t have access.
         </p>
         <Button variant="outline" onClick={() => router.push("/app")}>
           Back to dashboard

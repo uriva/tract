@@ -78,8 +78,21 @@ function CompareView({
     router.push(`/app/contract/${contractId}`);
   }
 
-  if (isLoading || !contract) {
+  if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading...</div>;
+  }
+
+  if (!contract) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Contract not found, or you don&apos;t have access.
+        </p>
+        <Button variant="outline" onClick={() => router.push("/app")}>
+          Back to dashboard
+        </Button>
+      </div>
+    );
   }
 
   if (!myParticipant || !theirParticipant) {
