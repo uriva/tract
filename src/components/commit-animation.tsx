@@ -91,7 +91,7 @@ export function CommitAnimation() {
     <div className="w-full flex justify-center">
       <svg
         viewBox="0 0 400 380"
-        className="w-full max-w-[320px] h-auto"
+        className="w-full max-w-[400px] h-auto"
         aria-label="Animated commit graph showing two branches diverging and converging"
       >
         {/* Edges */}

@@ -40,7 +40,7 @@ export default function HomePage() {
       <main className="flex-1">
         {/* Hero */}
         <section className="max-w-5xl mx-auto px-6 pt-24 pb-20">
-          <div className="grid md:grid-cols-[1fr_auto] gap-12 items-center">
+          <div className="grid md:grid-cols-[1fr_auto] gap-12 md:gap-16 items-center">
             <div className="max-w-lg space-y-6 page-enter">
               <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.1]">
                 Contracts that track
@@ -64,7 +64,7 @@ export default function HomePage() {
                 )}
               </div>
             </div>
-            <div className="hidden md:block page-enter" style={{ animationDelay: "0.15s" }}>
+            <div className="page-enter" style={{ animationDelay: "0.15s" }}>
               <CommitAnimation />
             </div>
           </div>
