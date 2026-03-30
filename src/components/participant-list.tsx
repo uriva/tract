@@ -58,11 +58,11 @@ export function ParticipantList({
         const hasDivergence = myHeadCommitId && theirHead && myHeadCommitId !== theirHead;
 
         return (
-          <div key={p.id} className="flex items-center justify-between py-1">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-muted-foreground/40" />
-              <span className="text-sm truncate max-w-[140px]">{p.email}</span>
-              <Badge variant="secondary" className="text-[10px]">
+          <div key={p.id} className="flex items-center justify-between gap-2 py-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0" />
+              <span className="text-sm truncate">{p.email}</span>
+              <Badge variant="secondary" className="text-[10px] shrink-0">
                 {p.role}
               </Badge>
             </div>
@@ -76,7 +76,7 @@ export function ParticipantList({
             )}
 
             {!hasDivergence && theirHead && (
-              <span className="text-[10px] text-muted-foreground">in agreement</span>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">in agreement</span>
             )}
           </div>
         );
