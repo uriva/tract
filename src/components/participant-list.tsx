@@ -71,7 +71,10 @@ export function ParticipantList({
         <div className="flex items-center justify-between py-1">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-accent" />
-            <span className="text-sm">You</span>
+            <span
+              className={`text-sm ${me.headCommitId && onSelectVersion ? "cursor-pointer hover:text-accent transition-colors" : ""}`}
+              onClick={() => me.headCommitId && onSelectVersion?.(me.headCommitId)}
+            >You</span>
             <Badge variant="secondary" className="text-[10px]">
               {me.role}
             </Badge>
