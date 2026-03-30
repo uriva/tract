@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { computeLineDiffs, applySelectedChanges, LineDiff } from "@/lib/diff";
+import { computeLineDiffs, applySelectedChanges, pairWordDiffs, LineDiff, type WordSegment } from "@/lib/diff";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,6 +25,8 @@ export function DiffViewer({
     () => computeLineDiffs(myContent, theirContent),
     [myContent, theirContent]
   );
+
+  const wordSegments = useMemo(() => pairWordDiffs(diffs), [diffs]);
 
   const changedIndices = useMemo(
     () =>
@@ -115,6 +117,7 @@ export function DiffViewer({
               index={i}
               isApproved={approved.has(i)}
               onToggle={toggleLine}
+              wordSegments={wordSegments.get(i)}
             />
           ))}
         </div>
@@ -128,11 +131,13 @@ function DiffLine({
   index,
   isApproved,
   onToggle,
+  wordSegments,
 }: {
   diff: LineDiff;
   index: number;
   isApproved: boolean;
   onToggle: (index: number) => void;
+  wordSegments?: WordSegment[];
 }) {
   if (diff.type === "unchanged") {
     return (
@@ -176,7 +181,19 @@ function DiffLine({
           isAdded ? "diff-text-added" : "diff-text-removed"
         }`}
       >
-        {diff.value || "\u00A0"}
+        {wordSegments ? (
+          wordSegments.map((seg, i) =>
+            seg.type === "changed" ? (
+              <span key={i} className="diff-word-changed">
+                {seg.text}
+              </span>
+            ) : (
+              <span key={i}>{seg.text}</span>
+            ),
+          )
+        ) : (
+          diff.value || "\u00A0"
+        )}
       </div>
     </div>
   );

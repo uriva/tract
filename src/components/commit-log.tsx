@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { displayName } from "@/lib/utils";
+import { buildLayout } from "@/lib/commit-layout";
 
 interface Commit {
   id: string;
@@ -40,104 +41,6 @@ const LANE_COLORS = [
   "#a64d79",
   "#76a5af",
 ];
-
-interface LayoutNode {
-  commit: Commit;
-  lane: number;
-  row: number;
-  parentRow?: number;
-  parentLane?: number;
-}
-
-function buildLayout(commits: Commit[]): LayoutNode[] {
-  if (commits.length === 0) return [];
-
-  // Build adjacency: parent → children
-  const childrenOf = new Map<string, Commit[]>();
-  const commitById = new Map<string, Commit>();
-  const roots: Commit[] = [];
-
-  for (const c of commits) {
-    commitById.set(c.id, c);
-    if (!c.parent?.id) {
-      roots.push(c);
-    } else {
-      const arr = childrenOf.get(c.parent.id) ?? [];
-      arr.push(c);
-      childrenOf.set(c.parent.id, arr);
-    }
-  }
-
-  // Topological sort: DFS from tips (leaf commits) walking backwards,
-  // keeping each branch contiguous. We find all tips (commits with no children),
-  // sort tips by newest first, then for each tip walk down to the fork point.
-  const hasChildren = new Set<string>();
-  for (const c of commits) {
-    if (c.parent?.id) hasChildren.add(c.parent.id);
-  }
-  const tips = commits
-    .filter((c) => !hasChildren.has(c.id))
-    .sort((a, b) => b.createdAt - a.createdAt);
-
-  const sorted: Commit[] = [];
-  const visited = new Set<string>();
-
-  for (const tip of tips) {
-    // Walk from tip to root, collecting unvisited commits
-    const branch: Commit[] = [];
-    let cur: Commit | undefined = tip;
-    while (cur && !visited.has(cur.id)) {
-      branch.push(cur);
-      visited.add(cur.id);
-      cur = cur.parent?.id ? commitById.get(cur.parent.id) : undefined;
-    }
-    sorted.push(...branch);
-  }
-
-  // Any remaining commits (shouldn't happen, but safety)
-  for (const c of commits) {
-    if (!visited.has(c.id)) {
-      sorted.push(c);
-      visited.add(c.id);
-    }
-  }
-
-  const idToRow = new Map<string, number>();
-  sorted.forEach((c, i) => idToRow.set(c.id, i));
-
-  // Find which commits are branch points (have multiple children)
-  const childCount = new Map<string, number>();
-  for (const c of sorted) {
-    const pid = c.parent?.id;
-    if (pid) childCount.set(pid, (childCount.get(pid) ?? 0) + 1);
-  }
-
-  // Assign lanes: walk in display order (top to bottom).
-  // Each tip starts on its own lane. A commit inherits its child's lane
-  // unless it's a fork point (multiple children), in which case it takes
-  // the lane of the first child encountered.
-  const commitLane = new Map<string, number>();
-  let nextLane = 0;
-
-  for (const c of sorted) {
-    if (!commitLane.has(c.id)) {
-      commitLane.set(c.id, nextLane++);
-    }
-    const myLane = commitLane.get(c.id)!;
-    const pid = c.parent?.id;
-    if (pid && !commitLane.has(pid)) {
-      commitLane.set(pid, myLane);
-    }
-  }
-
-  return sorted.map((commit, row) => {
-    const lane = commitLane.get(commit.id) ?? 0;
-    const pid = commit.parent?.id;
-    const parentRow = pid ? idToRow.get(pid) : undefined;
-    const parentLane = pid ? commitLane.get(pid) : undefined;
-    return { commit, lane, row, parentRow, parentLane };
-  });
-}
 
 export function CommitLog({
   commits,
@@ -293,6 +196,7 @@ export function CommitLog({
                     return (
                       <span
                         key={p.id}
+                        title={p.email || undefined}
                         className="text-[9px] font-medium px-1.5 py-0.5 rounded-full"
                         style={{
                           backgroundColor: `color-mix(in oklch, ${LANE_COLORS[i % LANE_COLORS.length]} 20%, transparent)`,
@@ -320,7 +224,7 @@ export function CommitLog({
                       T
                     </span>
                   )}
-                  {authorLabel} &middot; {getTimeAgo(commit.createdAt)}
+                  <span title={commit.author?.email || undefined}>{authorLabel}</span> &middot; {getTimeAgo(commit.createdAt)}
                 </div>
               </button>
             );

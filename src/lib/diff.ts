@@ -1,4 +1,4 @@
-import { diffLines, Change } from "diff";
+import { diffLines, diffWordsWithSpace, Change } from "diff";
 
 export interface LineDiff {
   type: "added" | "removed" | "unchanged";
@@ -50,6 +50,78 @@ export function computeLineDiffs(
 
   const hasChanges = diffs.some((d) => d.type !== "unchanged");
   return { diffs, hasChanges };
+}
+
+/** A segment of text within a line, with word-level diff info. */
+export interface WordSegment {
+  text: string;
+  type: "equal" | "changed";
+}
+
+/**
+ * For a pair of removed + added lines, compute word-level diff segments.
+ * Returns segments for the removed line and segments for the added line.
+ */
+export function computeWordSegments(
+  removedText: string,
+  addedText: string,
+): { removedSegments: WordSegment[]; addedSegments: WordSegment[] } {
+  const changes = diffWordsWithSpace(removedText, addedText);
+  const removedSegments: WordSegment[] = [];
+  const addedSegments: WordSegment[] = [];
+
+  for (const change of changes) {
+    if (change.added) {
+      addedSegments.push({ text: change.value, type: "changed" });
+    } else if (change.removed) {
+      removedSegments.push({ text: change.value, type: "changed" });
+    } else {
+      removedSegments.push({ text: change.value, type: "equal" });
+      addedSegments.push({ text: change.value, type: "equal" });
+    }
+  }
+
+  return { removedSegments, addedSegments };
+}
+
+/**
+ * Pair adjacent removed/added lines for word-level diffing.
+ * Returns a map from diff index → WordSegment[] for lines that have a pair.
+ */
+export function pairWordDiffs(diffs: LineDiff[]): Map<number, WordSegment[]> {
+  const segments = new Map<number, WordSegment[]>();
+
+  // Find blocks of consecutive removed lines followed by consecutive added lines
+  let i = 0;
+  while (i < diffs.length) {
+    if (diffs[i].type === "removed") {
+      const removedStart = i;
+      while (i < diffs.length && diffs[i].type === "removed") i++;
+      const addedStart = i;
+      while (i < diffs.length && diffs[i].type === "added") i++;
+      const addedEnd = i;
+
+      const removedCount = addedStart - removedStart;
+      const addedCount = addedEnd - addedStart;
+
+      // Pair them 1:1 as far as both sides go
+      const pairCount = Math.min(removedCount, addedCount);
+      for (let p = 0; p < pairCount; p++) {
+        const ri = removedStart + p;
+        const ai = addedStart + p;
+        const { removedSegments, addedSegments } = computeWordSegments(
+          diffs[ri].value,
+          diffs[ai].value,
+        );
+        segments.set(ri, removedSegments);
+        segments.set(ai, addedSegments);
+      }
+    } else {
+      i++;
+    }
+  }
+
+  return segments;
 }
 
 /**

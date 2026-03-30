@@ -54,7 +54,7 @@ export function CommitDetailDialog({
             {commit.id.slice(0, 7)}
           </DialogTitle>
           <DialogDescription>
-            {authorLabel} &middot; {dateStr}
+            <span title={commit.author?.email || undefined}>{authorLabel}</span> &middot; {dateStr}
           </DialogDescription>
         </DialogHeader>
 

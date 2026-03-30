@@ -50,6 +50,8 @@
   --color-diff-removed-fg: var(--diff-removed-fg);
   --color-diff-added-line: var(--diff-added-line);
   --color-diff-removed-line: var(--diff-removed-line);
+  --color-diff-word-added: var(--diff-word-added);
+  --color-diff-word-removed: var(--diff-word-removed);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -100,6 +102,8 @@
   --diff-removed-fg: oklch(0.35 0.12 25);
   --diff-added-line: oklch(0.96 0.03 145);
   --diff-removed-line: oklch(0.96 0.02 25);
+  --diff-word-added: oklch(0.85 0.10 145);
+  --diff-word-removed: oklch(0.85 0.08 25);
 }
 
 .dark {
@@ -142,6 +146,8 @@
   --diff-removed-fg: oklch(0.80 0.08 25);
   --diff-added-line: oklch(0.20 0.04 145);
   --diff-removed-line: oklch(0.20 0.03 25);
+  --diff-word-added: oklch(0.32 0.10 145);
+  --diff-word-removed: oklch(0.32 0.08 25);
 }
 
 @layer base {
@@ -179,6 +185,24 @@
   background: var(--diff-removed);
   color: var(--diff-removed-fg);
   text-decoration: line-through;
+}
+.diff-word-added {
+  background: var(--diff-added);
+  border-radius: 2px;
+}
+.diff-word-removed {
+  background: var(--diff-removed);
+  border-radius: 2px;
+}
+.diff-text-added .diff-word-changed {
+  background: var(--diff-word-added);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+.diff-text-removed .diff-word-changed {
+  background: var(--diff-word-removed);
+  border-radius: 2px;
+  padding: 1px 0;
 }
 
 /* Markdown rendered view */

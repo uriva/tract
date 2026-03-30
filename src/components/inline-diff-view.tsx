@@ -1,11 +1,27 @@
 "use client";
 
 import { useMemo } from "react";
-import { computeLineDiffs } from "@/lib/diff";
+import { computeLineDiffs, pairWordDiffs, type WordSegment } from "@/lib/diff";
 
 interface InlineDiffViewProps {
   baseContent: string;
   compareContent: string;
+}
+
+function WordSegments({ segments }: { segments: WordSegment[] }) {
+  return (
+    <>
+      {segments.map((seg, i) =>
+        seg.type === "changed" ? (
+          <span key={i} className="diff-word-changed">
+            {seg.text}
+          </span>
+        ) : (
+          <span key={i}>{seg.text}</span>
+        ),
+      )}
+    </>
+  );
 }
 
 export function InlineDiffView({
@@ -16,6 +32,8 @@ export function InlineDiffView({
     () => computeLineDiffs(baseContent, compareContent),
     [baseContent, compareContent],
   );
+
+  const wordSegments = useMemo(() => pairWordDiffs(diffs), [diffs]);
 
   if (!hasChanges) {
     return (
@@ -42,6 +60,7 @@ export function InlineDiffView({
         }
 
         const isAdded = diff.type === "added";
+        const segments = wordSegments.get(i);
 
         return (
           <div
@@ -67,7 +86,11 @@ export function InlineDiffView({
                 isAdded ? "diff-text-added" : "diff-text-removed"
               }`}
             >
-              {diff.value || "\u00A0"}
+              {segments ? (
+                <WordSegments segments={segments} />
+              ) : (
+                diff.value || "\u00A0"
+              )}
             </div>
           </div>
         );

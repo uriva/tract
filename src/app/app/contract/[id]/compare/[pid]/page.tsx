@@ -134,7 +134,7 @@ function CompareView({
           </Button>
           <h1 className="text-xl font-semibold tracking-tight">Compare changes</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Your version vs. {displayName(theirParticipant.email, theirParticipant.user?.id)}&apos;s version
+            Your version vs. <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version
           </p>
         </div>
       </div>
@@ -148,7 +148,7 @@ function CompareView({
         </div>
         <div className="p-3 rounded-lg border border-border bg-card">
           <div className="text-xs text-muted-foreground">
-            {displayName(theirParticipant.email, theirParticipant.user?.id)}&apos;s version
+            <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version
           </div>
           <div className="text-xs font-mono mt-1">{theirHead.id.slice(0, 7)}</div>
           <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
