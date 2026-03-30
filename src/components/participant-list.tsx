@@ -113,7 +113,7 @@ export function ParticipantList({
 
             {status === "has-notes" && (
               <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
-                <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap">
+                <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10">
                   has notes
                 </Button>
               </Link>
