@@ -200,96 +200,19 @@ function ContractEditor({ contractId }: { contractId: string }) {
     if (!contract) return;
     setDownloading(true);
     try {
-      const { marked } = await import("marked");
-      const html2pdf = (await import("html2pdf.js")).default;
-
-      const bodyHtml = await marked.parse(displayContent);
-      const wrapper = document.createElement("div");
-      wrapper.innerHTML = `
-        <div style="font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; line-height: 1.7; font-size: 14px; padding: 8px;">
-          <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 16px 0; color: #111;">${contract.name}</h1>
-          <div>${bodyHtml}</div>
-        </div>
-      `;
-
-      // Force all elements to simple colors so html2canvas doesn't choke on oklch/lab
-      wrapper.querySelectorAll("*").forEach((el) => {
-        const s = (el as HTMLElement).style;
-        if (!s.color) s.color = "#1a1a1a";
-        if (!s.borderColor) s.borderColor = "#d1d5db";
+      const res = await fetch("/api/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: contract.name, content: displayContent }),
       });
-
-      // Style common markdown elements
-      wrapper.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach((el) => {
-        const s = (el as HTMLElement).style;
-        s.color = "#111";
-        s.marginTop = "1.2em";
-        s.marginBottom = "0.4em";
-      });
-      wrapper.querySelectorAll("p").forEach((el) => {
-        (el as HTMLElement).style.margin = "0.6em 0";
-      });
-      wrapper.querySelectorAll("ul,ol").forEach((el) => {
-        (el as HTMLElement).style.paddingLeft = "1.5em";
-      });
-      wrapper.querySelectorAll("code").forEach((el) => {
-        const s = (el as HTMLElement).style;
-        s.background = "#f3f4f6";
-        s.padding = "1px 4px";
-        s.borderRadius = "3px";
-        s.fontSize = "0.9em";
-      });
-      wrapper.querySelectorAll("blockquote").forEach((el) => {
-        const s = (el as HTMLElement).style;
-        s.borderLeft = "3px solid #d1d5db";
-        s.paddingLeft = "12px";
-        s.color = "#6b7280";
-        s.margin = "0.8em 0";
-      });
-      wrapper.querySelectorAll("table").forEach((el) => {
-        const s = (el as HTMLElement).style;
-        s.borderCollapse = "collapse";
-        s.width = "100%";
-        s.margin = "0.8em 0";
-      });
-      wrapper.querySelectorAll("th,td").forEach((el) => {
-        const s = (el as HTMLElement).style;
-        s.border = "1px solid #d1d5db";
-        s.padding = "6px 10px";
-        s.textAlign = "left";
-      });
-      wrapper.querySelectorAll("th").forEach((el) => {
-        (el as HTMLElement).style.background = "#f3f4f6";
-      });
-
-      await html2pdf()
-        .set({
-          margin: [12, 16],
-          filename: `${contract.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`,
-          html2canvas: {
-            scale: 2,
-            onclone: (clonedDoc: Document) => {
-              // Strip stylesheet rules that use oklch()/lab() — html2canvas can't parse them
-              for (const sheet of Array.from(clonedDoc.styleSheets)) {
-                try {
-                  const rules = sheet.cssRules;
-                  for (let i = rules.length - 1; i >= 0; i--) {
-                    const text = rules[i].cssText;
-                    if (text.includes("oklch(") || text.includes("lab(")) {
-                      sheet.deleteRule(i);
-                    }
-                  }
-                } catch {
-                  // Cross-origin sheets — remove entirely
-                  sheet.ownerNode?.parentNode?.removeChild(sheet.ownerNode);
-                }
-              }
-            },
-          },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        })
-        .from(wrapper)
-        .save();
+      if (!res.ok) throw new Error("PDF generation failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${contract.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (e) {
       console.error("PDF download failed:", e);
     } finally {
@@ -377,7 +300,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
           {editingName ? (
             <input
