@@ -13,6 +13,9 @@ import { AppShell } from "@/components/app-shell";
 import { ParticipantList } from "@/components/participant-list";
 import { CommitLog } from "@/components/commit-log";
 import { InviteDialog } from "@/components/invite-dialog";
+import { MarkdownView } from "@/components/markdown-view";
+
+type Mode = "view" | "edit";
 
 function ContractEditor({ contractId }: { contractId: string }) {
   const { user } = db.useAuth();
@@ -20,6 +23,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [mode, setMode] = useState<Mode>("view");
+  const [viewingCommitId, setViewingCommitId] = useState<string | null>(null);
 
   const { data, isLoading } = db.useQuery({
     contracts: {
@@ -45,6 +50,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const myHeadCommitId = myParticipant?.headCommitId;
   const headCommit = commits.find((c) => c.id === myHeadCommitId);
 
+  // Which commit are we currently looking at?
+  const activeCommitId = viewingCommitId ?? myHeadCommitId;
+  const activeCommit = commits.find((c) => c.id === activeCommitId);
+  const isViewingHistory = viewingCommitId !== null && viewingCommitId !== myHeadCommitId;
+
   const [content, setContent] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
@@ -55,6 +65,40 @@ function ContractEditor({ contractId }: { contractId: string }) {
   }
 
   const hasChanges = initialized && content !== headCommit?.content;
+
+  // When clicking a commit in history
+  function handleSelectCommit(commitId: string) {
+    if (commitId === myHeadCommitId) {
+      // Going back to HEAD
+      setViewingCommitId(null);
+      setMode("view");
+    } else {
+      setViewingCommitId(commitId);
+      setMode("view"); // Always view when browsing history
+    }
+  }
+
+  // Move HEAD to a different commit
+  async function handleCheckout(commitId: string) {
+    if (!myParticipant) return;
+    await db.transact([
+      db.tx.participants[myParticipant.id].update({
+        headCommitId: commitId,
+      }),
+    ]);
+    const targetCommit = commits.find((c) => c.id === commitId);
+    if (targetCommit) {
+      setContent(targetCommit.content);
+    }
+    setViewingCommitId(null);
+  }
+
+  // Switch to edit mode (always edits HEAD)
+  function enterEditMode() {
+    setViewingCommitId(null);
+    setContent(headCommit?.content ?? "");
+    setMode("edit");
+  }
 
   const handleCommit = useCallback(async () => {
     if (!hasChanges || !user || !myParticipant || content === null) return;
@@ -77,7 +121,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
       }),
     ];
 
-    // Link to parent if we have one
     if (myHeadCommitId) {
       txs[0] = db.tx.commits[newCommitId]
         .update({
@@ -93,6 +136,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
     await db.transact(txs);
     setCommitMsg("");
     setSaving(false);
+    setMode("view");
   }, [hasChanges, user, myParticipant, content, commitMsg, contractId, myHeadCommitId]);
 
   if (isLoading || !contract) {
@@ -112,6 +156,10 @@ function ContractEditor({ contractId }: { contractId: string }) {
     );
   }
 
+  // The content to display: edit buffer if editing, otherwise the active commit's content
+  const displayContent =
+    mode === "edit" ? (content ?? "") : (activeCommit?.content ?? "");
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -119,38 +167,80 @@ function ContractEditor({ contractId }: { contractId: string }) {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{contract.name}</h1>
           <p className="text-xs text-muted-foreground mt-1 font-mono">
-            HEAD: {myHeadCommitId?.slice(0, 7) ?? "none"}
+            {isViewingHistory
+              ? `Viewing: ${activeCommitId?.slice(0, 7)} (not your HEAD)`
+              : `HEAD: ${myHeadCommitId?.slice(0, 7) ?? "none"}`}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
-          Invite
-        </Button>
+        <div className="flex items-center gap-2">
+          {mode === "view" && !isViewingHistory && (
+            <Button size="sm" variant="outline" onClick={enterEditMode}>
+              Edit
+            </Button>
+          )}
+          {mode === "edit" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setContent(headCommit?.content ?? "");
+                setMode("view");
+              }}
+            >
+              Cancel
+            </Button>
+          )}
+          {isViewingHistory && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setViewingCommitId(null);
+                setMode("view");
+              }}
+            >
+              Back to HEAD
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
+            Invite
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8">
-        {/* Editor */}
+        {/* Main content area */}
         <div className="space-y-4">
-          <Textarea
-            className="contract-editor min-h-[500px] resize-y bg-card border-border focus:border-ring/30"
-            value={content ?? ""}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Start writing your contract..."
-          />
-
-          {hasChanges && (
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-accent/5">
-              <Input
-                className="flex-1 text-sm h-9"
-                placeholder="Commit message (optional)"
-                value={commitMsg}
-                onChange={(e) => setCommitMsg(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCommit();
-                }}
+          {mode === "edit" ? (
+            <>
+              <Textarea
+                className="contract-editor min-h-[500px] resize-y bg-card border-border focus:border-ring/30"
+                value={content ?? ""}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Start writing your contract..."
+                autoFocus
               />
-              <Button size="sm" onClick={handleCommit} disabled={saving}>
-                {saving ? "Saving..." : "Commit"}
-              </Button>
+
+              {hasChanges && (
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-accent/5">
+                  <Input
+                    className="flex-1 text-sm h-9"
+                    placeholder="Commit message (optional)"
+                    value={commitMsg}
+                    onChange={(e) => setCommitMsg(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCommit();
+                    }}
+                  />
+                  <Button size="sm" onClick={handleCommit} disabled={saving}>
+                    {saving ? "Saving..." : "Commit"}
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="min-h-[500px] p-6 rounded-lg border border-border bg-card">
+              <MarkdownView content={displayContent} />
             </div>
           )}
         </div>
@@ -166,7 +256,13 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
           <Separator />
 
-          <CommitLog commits={commits} headCommitId={myHeadCommitId} />
+          <CommitLog
+            commits={commits}
+            headCommitId={myHeadCommitId}
+            viewingCommitId={activeCommitId}
+            onSelectCommit={handleSelectCommit}
+            onCheckout={handleCheckout}
+          />
         </div>
       </div>
 
