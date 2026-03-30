@@ -47,11 +47,12 @@ export function LoginForm() {
       await db.auth.signInWithMagicCode({ email, code });
     } catch (err) {
       console.error("[tract] magic code verification failed", err);
-      // Only show error if the component is still mounted.
-      // If auth succeeded but signInWithMagicCode threw during post-auth
-      // cleanup, the component will have already unmounted (AuthGate renders
-      // children instead of LoginForm). Showing an error at that point would
-      // flash "Invalid code" even though login worked.
+      // signInWithMagicCode can update auth state (logging the user in)
+      // but still throw during post-auth cleanup. When that happens,
+      // AuthGate will unmount this component on the next React render.
+      // We defer the error so React can process the auth state change
+      // first — if we're still mounted after that, it's a real error.
+      await new Promise((r) => setTimeout(r, 100));
       if (mountedRef.current) {
         setError("Invalid code. Please try again.");
       }
