@@ -4,6 +4,7 @@ import { marked, type Token } from "marked";
 
 // Markdown tokens → pdfkit calls. No HTML, no CSS.
 export async function POST(req: NextRequest) {
+  try {
   const { title, content } = (await req.json()) as {
     title: string;
     content: string;
@@ -287,4 +288,11 @@ export async function POST(req: NextRequest) {
       "Content-Disposition": `attachment; filename="${(title || "contract").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf"`,
     },
   });
+  } catch (err) {
+    console.error("PDF generation error:", err);
+    return NextResponse.json(
+      { error: "PDF generation failed", details: String(err) },
+      { status: 500 },
+    );
+  }
 }

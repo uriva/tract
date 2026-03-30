@@ -27,6 +27,7 @@ interface ParticipantListProps {
   contractId: string;
   myHeadCommitId?: string;
   onSelectVersion?: (commitId: string) => void;
+  colorMap?: Map<string, string>;
 }
 
 export function ParticipantList({
@@ -36,6 +37,7 @@ export function ParticipantList({
   contractId,
   myHeadCommitId,
   onSelectVersion,
+  colorMap,
 }: ParticipantListProps) {
   const me = participants.find(
     (p) => p.user?.id === currentUserId
@@ -70,6 +72,10 @@ export function ParticipantList({
       {me && (
         <div className="flex items-center justify-between py-1">
            <div className="flex items-center gap-2">
+            <div
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: colorMap?.get(me.id) ?? "var(--color-muted-foreground)" }}
+            />
             <span
               className={`text-sm ${me.headCommitId && onSelectVersion ? "cursor-pointer hover:text-accent transition-colors" : ""}`}
               onClick={() => me.headCommitId && onSelectVersion?.(me.headCommitId)}
@@ -108,6 +114,10 @@ export function ParticipantList({
         return (
           <div key={p.id} className="flex items-center justify-between gap-2 py-1">
             <div className="flex items-center gap-2 min-w-0">
+              <div
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: colorMap?.get(p.id) ?? "var(--color-muted-foreground)" }}
+              />
               <span
                 className={`text-sm truncate ${p.headCommitId && onSelectVersion ? "cursor-pointer hover:text-accent transition-colors" : ""}`}
                 title={p.email || undefined}

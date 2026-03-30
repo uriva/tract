@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, use } from "react";
+import { useState, useCallback, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
@@ -18,7 +18,7 @@ import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
 import { InlineDiffView } from "@/components/inline-diff-view";
 import { CommitDetailDialog } from "@/components/commit-detail-dialog";
-import { displayName } from "@/lib/utils";
+import { displayName, assignParticipantColors } from "@/lib/utils";
 
 type Mode = "view" | "edit";
 
@@ -58,6 +58,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const contract = data?.contracts?.[0];
   const commits = contract?.commits ?? [];
   const participants = contract?.participants ?? [];
+  const colorMap = useMemo(() => assignParticipantColors(participants), [participants]);
 
   const myParticipant = participants.find(
     (p) => p.user?.id === user?.id
@@ -482,16 +483,23 @@ function ContractEditor({ contractId }: { contractId: string }) {
             <div className="space-y-3">
               {/* Approval indicator */}
               {approvers.length > 0 && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
-                  <span className="inline-block w-2 h-2 rounded-full bg-green-500/80" />
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+                  {approvers.map((p) => (
+                    <span
+                      key={`dot-${p.id}`}
+                      className="inline-block w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: colorMap.get(p.id) ?? "var(--color-muted-foreground)" }}
+                    />
+                  ))}
                   This is{" "}
                   {approvers.map((p, i) => {
                     const isMe = p.user?.id === user?.id;
+                    const pColor = colorMap.get(p.id);
                     const label = isMe ? "your" : `${displayName(p.email, p.user?.id)}'s`;
                     return (
                       <span key={p.id}>
                         {i > 0 && (i === approvers.length - 1 ? " and " : ", ")}
-                        <span title={p.email || undefined}>{label}</span>
+                        <span title={p.email || undefined} style={pColor ? { color: pColor } : undefined}>{label}</span>
                       </span>
                     );
                   })}{" "}
@@ -560,6 +568,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
             contractId={contractId}
             myHeadCommitId={myHeadCommitId}
             onSelectVersion={handleSelectCommit}
+            colorMap={colorMap}
           />
 
           <Separator />
@@ -572,6 +581,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
             currentUserId={user?.id ?? ""}
             onSelectCommit={handleSelectCommit}
             onCheckout={handleCheckout}
+            colorMap={colorMap}
           />
         </div>
       </div>

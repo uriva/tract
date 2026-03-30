@@ -30,17 +30,8 @@ interface CommitLogProps {
   currentUserId?: string;
   onSelectCommit?: (commitId: string) => void;
   onCheckout?: (commitId: string) => void;
+  colorMap?: Map<string, string>;
 }
-
-// Assign colors to participants for DAG markers
-const LANE_COLORS = [
-  "var(--color-accent)",
-  "#6d9eeb",
-  "#93c47d",
-  "#e69138",
-  "#a64d79",
-  "#76a5af",
-];
 
 export function CommitLog({
   commits,
@@ -50,12 +41,26 @@ export function CommitLog({
   currentUserId,
   onSelectCommit,
   onCheckout,
+  colorMap,
 }: CommitLogProps) {
   const layout = useMemo(() => buildLayout(commits), [commits]);
   const maxLane = useMemo(
     () => Math.max(0, ...layout.map((n) => n.lane)),
     [layout],
   );
+
+  // Map commitId → participant color (only for head commits)
+  const commitColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (colorMap) {
+      for (const p of participants) {
+        if (p.headCommitId && colorMap.has(p.id)) {
+          map.set(p.headCommitId, colorMap.get(p.id)!);
+        }
+      }
+    }
+    return map;
+  }, [participants, colorMap]);
 
   // Map commitId → participants on that commit
   const commitParticipants = useMemo(() => {
@@ -133,8 +138,7 @@ export function CommitLog({
 
             {/* Dots */}
             {layout.map((node) => {
-              const isHead = node.commit.id === headCommitId;
-              const isTractCommit = !node.commit.author;
+              const headColor = commitColorMap.get(node.commit.id);
               const cx = laneX(node.lane);
               const cy = node.row * ROW_H + ROW_H / 2;
 
@@ -143,14 +147,8 @@ export function CommitLog({
                   key={`${node.commit.id}-dot`}
                   cx={cx}
                   cy={cy}
-                  r={isHead ? DOT_R + 1 : DOT_R}
-                  fill={
-                    isHead
-                      ? "var(--color-accent)"
-                      : isTractCommit
-                      ? "#6d9eeb"
-                      : "var(--color-muted-foreground)"
-                  }
+                  r={headColor ? DOT_R + 1 : DOT_R}
+                  fill={headColor ?? "var(--color-muted-foreground)"}
                   stroke="var(--color-background)"
                   strokeWidth={2}
                 />
@@ -161,7 +159,6 @@ export function CommitLog({
           {/* Commit labels */}
           {layout.map((node) => {
             const { commit, row } = node;
-            const isHead = commit.id === headCommitId;
             const isViewing = commit.id === viewingCommitId;
             const isTract = !commit.author;
             const authorLabel = isTract ? "Tract" : displayName(commit.author?.email, commit.author?.id);
@@ -174,8 +171,6 @@ export function CommitLog({
                 className={`absolute right-0 text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
                   isViewing
                     ? "bg-secondary border border-ring/30"
-                    : isHead
-                    ? "bg-accent/10 border border-accent/20"
                     : "hover:bg-secondary/50 border border-transparent"
                 }`}
                 style={{
@@ -190,17 +185,18 @@ export function CommitLog({
                     {commit.id.slice(0, 7)}
                   </span>
                   {/* Participant markers */}
-                  {onThisCommit.map((p, i) => {
+                  {onThisCommit.map((p) => {
                     const isMe = p.user?.id === currentUserId;
                     const label = isMe ? "You" : displayName(p.email, p.user?.id);
+                    const pColor = colorMap?.get(p.id) ?? "var(--color-muted-foreground)";
                     return (
                       <span
                         key={p.id}
                         title={p.email || undefined}
                         className="text-[9px] font-medium px-1.5 py-0.5 rounded-full"
                         style={{
-                          backgroundColor: `color-mix(in oklch, ${LANE_COLORS[i % LANE_COLORS.length]} 20%, transparent)`,
-                          color: LANE_COLORS[i % LANE_COLORS.length],
+                          backgroundColor: `color-mix(in oklch, ${pColor} 20%, transparent)`,
+                          color: pColor,
                         }}
                       >
                         {label}
