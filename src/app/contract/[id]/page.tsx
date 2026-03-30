@@ -356,6 +356,21 @@ function ContractEditor({ contractId }: { contractId: string }) {
             </>
           ) : (
             <div className="space-y-3">
+              {/* Adopt bar — shown when viewing a historical commit */}
+              {isViewingHistory && (
+                <div className="flex items-center justify-between p-3 rounded-lg border border-accent/30 bg-accent/5">
+                  <p className="text-sm text-muted-foreground">
+                    Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
+                    {activeCommit?.author?.email
+                      ? ` by ${activeCommit.author.email.split("@")[0]}`
+                      : " by Tract"}
+                  </p>
+                  <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
+                    Adopt this version
+                  </Button>
+                </div>
+              )}
+
               {/* Approval indicator */}
               {approvers.length > 0 && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
@@ -376,21 +391,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
               <div className="min-h-[500px] p-6 rounded-lg border border-border bg-card">
                 <MarkdownView content={displayContent} />
               </div>
-
-              {/* Adopt bar — shown when viewing a historical commit */}
-              {isViewingHistory && (
-                <div className="flex items-center justify-between p-3 rounded-lg border border-accent/30 bg-accent/5">
-                  <p className="text-sm text-muted-foreground">
-                    Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
-                    {activeCommit?.author?.email
-                      ? ` by ${activeCommit.author.email.split("@")[0]}`
-                      : " by Tract"}
-                  </p>
-                  <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
-                    Adopt this version
-                  </Button>
-                </div>
-              )}
             </div>
           )}
         </div>
