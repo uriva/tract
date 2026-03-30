@@ -65,7 +65,7 @@ Rules:
   const text =
     data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-  // Generate a short commit message
+  // Generate a short commit message by summarizing actual changes
   const msgRes = await fetch(GEMINI_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -75,24 +75,36 @@ Rules:
           role: "user",
           parts: [
             {
-              text: `Summarize this contract edit request in under 10 words for a commit message. No quotes, no period. Request: "${prompt}"`,
+              text: `You are writing a short commit message (1-2 sentences) summarizing the actual changes made to a contract document. Describe WHAT changed in the document, not what was requested.
+
+Previous version:
+${content || "(empty)"}
+
+Updated version:
+${text}
+
+Write a concise commit message describing what changed. No quotes, no period at the end. Do not start with "Tract:" or any prefix.`,
             },
           ],
         },
       ],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 50,
+        maxOutputTokens: 150,
       },
     }),
   });
 
-  let commitMessage = "Tract: AI-suggested changes";
+  let commitMessage = "";
   if (msgRes.ok) {
     const msgData = await msgRes.json();
     const msg =
       msgData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-    if (msg) commitMessage = `Tract: ${msg}`;
+    if (msg) commitMessage = msg;
+  }
+
+  if (!commitMessage) {
+    commitMessage = "AI-suggested changes";
   }
 
   return NextResponse.json({ content: text, message: commitMessage });

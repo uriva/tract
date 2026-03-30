@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, use } from "react";
+import { useState, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
@@ -29,7 +29,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [commitDetailOpen, setCommitDetailOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
   const [downloading, setDownloading] = useState(false);
-  const pdfContentRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [commitError, setCommitError] = useState("");
   const [mode, setMode] = useState<Mode>("view");
@@ -198,18 +197,79 @@ function ContractEditor({ contractId }: { contractId: string }) {
   }
 
   async function handleDownloadPdf() {
-    if (!pdfContentRef.current || !contract) return;
+    if (!contract) return;
     setDownloading(true);
     try {
+      const { marked } = await import("marked");
       const html2pdf = (await import("html2pdf.js")).default;
+
+      const bodyHtml = await marked.parse(displayContent);
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = `
+        <div style="font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; line-height: 1.7; font-size: 14px; padding: 8px;">
+          <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 16px 0; color: #111;">${contract.name}</h1>
+          <div>${bodyHtml}</div>
+        </div>
+      `;
+
+      // Force all elements to simple colors so html2canvas doesn't choke on oklch/lab
+      wrapper.querySelectorAll("*").forEach((el) => {
+        const s = (el as HTMLElement).style;
+        if (!s.color) s.color = "#1a1a1a";
+        if (!s.borderColor) s.borderColor = "#d1d5db";
+      });
+
+      // Style common markdown elements
+      wrapper.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach((el) => {
+        const s = (el as HTMLElement).style;
+        s.color = "#111";
+        s.marginTop = "1.2em";
+        s.marginBottom = "0.4em";
+      });
+      wrapper.querySelectorAll("p").forEach((el) => {
+        (el as HTMLElement).style.margin = "0.6em 0";
+      });
+      wrapper.querySelectorAll("ul,ol").forEach((el) => {
+        (el as HTMLElement).style.paddingLeft = "1.5em";
+      });
+      wrapper.querySelectorAll("code").forEach((el) => {
+        const s = (el as HTMLElement).style;
+        s.background = "#f3f4f6";
+        s.padding = "1px 4px";
+        s.borderRadius = "3px";
+        s.fontSize = "0.9em";
+      });
+      wrapper.querySelectorAll("blockquote").forEach((el) => {
+        const s = (el as HTMLElement).style;
+        s.borderLeft = "3px solid #d1d5db";
+        s.paddingLeft = "12px";
+        s.color = "#6b7280";
+        s.margin = "0.8em 0";
+      });
+      wrapper.querySelectorAll("table").forEach((el) => {
+        const s = (el as HTMLElement).style;
+        s.borderCollapse = "collapse";
+        s.width = "100%";
+        s.margin = "0.8em 0";
+      });
+      wrapper.querySelectorAll("th,td").forEach((el) => {
+        const s = (el as HTMLElement).style;
+        s.border = "1px solid #d1d5db";
+        s.padding = "6px 10px";
+        s.textAlign = "left";
+      });
+      wrapper.querySelectorAll("th").forEach((el) => {
+        (el as HTMLElement).style.background = "#f3f4f6";
+      });
+
       await html2pdf()
         .set({
           margin: [12, 16],
           filename: `${contract.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`,
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: { scale: 2 },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         })
-        .from(pdfContentRef.current)
+        .from(wrapper)
         .save();
     } catch (e) {
       console.error("PDF download failed:", e);
@@ -243,7 +303,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
       }
 
       const data = await res.json();
-      const fullMsg = `${data.message}\n\nWritten as per ${requesterName}'s request: "${prompt}"`;
+      const truncatedPrompt = prompt.length > 120 ? prompt.slice(0, 120) + "..." : prompt;
+      const fullMsg = `${data.message}\n\nWritten as per ${requesterName}'s request: "${truncatedPrompt}"`;
 
       const newCommitId = id();
       await db.transact([
@@ -528,28 +589,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 ) : (
                   <MarkdownView content={displayContent} />
                 )}
-              </div>
-
-              {/* Hidden container for PDF rendering */}
-              <div style={{ position: "fixed", left: "-9999px", top: 0 }} aria-hidden>
-                <div
-                  ref={pdfContentRef}
-                  style={{
-                    padding: "32px",
-                    background: "white",
-                    color: "#1a1a1a",
-                    fontSize: "14px",
-                    lineHeight: "1.7",
-                    maxWidth: "210mm",
-                    width: "210mm",
-                    fontFamily: "system-ui, -apple-system, sans-serif",
-                  }}
-                >
-                  <h1 style={{ marginBottom: "8px", fontSize: "22px", fontWeight: 600 }}>
-                    {contract.name}
-                  </h1>
-                  <MarkdownView content={displayContent} />
-                </div>
               </div>
             </div>
           )}
