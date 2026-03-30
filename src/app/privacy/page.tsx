@@ -133,13 +133,13 @@ export default function PrivacyPage() {
               8. Contact
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              If you have questions about this privacy policy, please open an
-              issue on our{" "}
+              If you have questions about this privacy policy, please contact
+              us at{" "}
               <a
-                href="https://github.com/uriva/tract"
+                href="mailto:uri.valevski@gmail.com"
                 className="text-accent underline underline-offset-2 hover:opacity-70 transition-opacity"
               >
-                GitHub repository
+                uri.valevski@gmail.com
               </a>
               .
             </p>
