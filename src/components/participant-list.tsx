@@ -84,7 +84,7 @@ export function ParticipantList({
             </div>
 
             {hasDivergence && theyAreAhead && (
-              <Link href={`/contract/${contractId}/compare/${p.id}`}>
+              <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
                 <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap">
                   has notes
                 </Button>

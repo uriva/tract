@@ -19,7 +19,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-border">
         <div className="max-w-5xl mx-auto w-full flex items-center justify-between px-6 h-14">
           <Link
-            href="/"
+            href="/app"
             className="text-base font-semibold tracking-tight hover:opacity-70 transition-opacity"
           >
             tract

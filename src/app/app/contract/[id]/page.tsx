@@ -339,7 +339,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         <p className="text-sm text-muted-foreground">
           You don&apos;t have access to this contract.
         </p>
-        <Button variant="outline" onClick={() => router.push("/")}>
+        <Button variant="outline" onClick={() => router.push("/app")}>
           Back to dashboard
         </Button>
       </div>

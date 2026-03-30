@@ -47,6 +47,9 @@ export function LoginForm() {
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">tract</h1>
         <p className="text-sm text-muted-foreground">
+          Version-controlled contract negotiation. Every edit is tracked, every participant has their own version.
+        </p>
+        <p className="text-sm text-muted-foreground">
           {step === "email"
             ? "Enter your email to sign in or create an account."
             : `We sent a code to ${email}`}

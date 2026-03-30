@@ -74,7 +74,7 @@ function CompareView({
     ]);
 
     setApplying(false);
-    router.push(`/contract/${contractId}`);
+    router.push(`/app/contract/${contractId}`);
   }
 
   if (isLoading || !contract) {
@@ -85,7 +85,7 @@ function CompareView({
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Participant not found.</p>
-        <Button variant="outline" onClick={() => router.push(`/contract/${contractId}`)}>
+        <Button variant="outline" onClick={() => router.push(`/app/contract/${contractId}`)}>
           Back to contract
         </Button>
       </div>
@@ -98,7 +98,7 @@ function CompareView({
         <p className="text-sm text-muted-foreground">
           Missing commit data. One or both participants have no commits.
         </p>
-        <Button variant="outline" onClick={() => router.push(`/contract/${contractId}`)}>
+        <Button variant="outline" onClick={() => router.push(`/app/contract/${contractId}`)}>
           Back to contract
         </Button>
       </div>
@@ -114,7 +114,7 @@ function CompareView({
             variant="ghost"
             size="sm"
             className="text-xs text-muted-foreground -ml-2 mb-2"
-            onClick={() => router.push(`/contract/${contractId}`)}
+            onClick={() => router.push(`/app/contract/${contractId}`)}
           >
             &larr; Back to {contract.name}
           </Button>
