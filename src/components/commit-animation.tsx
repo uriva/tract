@@ -30,16 +30,16 @@ type Pointer = {
 
 const NODES: Node[] = [
   // Shared root
-  { id: "c1", x: 200, y: 40, label: "Draft", color: "var(--color-foreground)", delay: 300 },
+  { id: "c1", x: 200, y: 50, label: "Draft", color: "var(--color-foreground)", delay: 300 },
   // Shared second
-  { id: "c2", x: 200, y: 100, label: "Terms added", color: "var(--color-foreground)", delay: 700 },
+  { id: "c2", x: 200, y: 130, label: "Terms added", color: "var(--color-foreground)", delay: 700 },
   // Branch A (left) — Alice edits
-  { id: "a1", x: 120, y: 170, label: "Payment clause", color: "var(--color-accent)", delay: 1300 },
-  { id: "a2", x: 120, y: 240, label: "Liability cap", color: "var(--color-accent)", delay: 1800 },
+  { id: "a1", x: 105, y: 225, label: "Payment clause", color: "var(--color-accent)", delay: 1300 },
+  { id: "a2", x: 105, y: 320, label: "Liability cap", color: "var(--color-accent)", delay: 1800 },
   // Branch B (right) — Bob edits
-  { id: "b1", x: 280, y: 190, label: "IP section", color: "var(--color-muted-foreground)", delay: 1500 },
+  { id: "b1", x: 295, y: 250, label: "IP section", color: "var(--color-muted-foreground)", delay: 1500 },
   // Converge — agreed version
-  { id: "m1", x: 200, y: 320, label: "Agreed", color: "var(--color-foreground)", delay: 2600 },
+  { id: "m1", x: 200, y: 425, label: "Agreed", color: "var(--color-foreground)", delay: 2600 },
 ];
 
 const EDGES: Edge[] = [
@@ -90,8 +90,8 @@ export function CommitAnimation() {
   return (
     <div className="w-full flex justify-center">
       <svg
-        viewBox="0 0 400 380"
-        className="w-full max-w-[400px] h-auto"
+        viewBox="0 0 400 500"
+        className="w-full max-w-[480px] h-auto"
         aria-label="Animated commit graph showing two branches diverging and converging"
       >
         {/* Edges */}
@@ -112,7 +112,7 @@ export function CommitAnimation() {
               d={path}
               fill="none"
               stroke="var(--color-border)"
-              strokeWidth={1.5}
+              strokeWidth={2}
               strokeDasharray={200}
               strokeDashoffset={200 * (1 - progress)}
               className="transition-none"
@@ -129,7 +129,7 @@ export function CommitAnimation() {
           const scale = Math.min(age / 200, 1);
           const opacity = Math.min(age / 150, 1);
           const isMerge = node.id === "m1";
-          const r = isMerge ? 7 : 5;
+          const r = isMerge ? 9 : 7;
 
           return (
             <g key={node.id} opacity={opacity}>
@@ -139,14 +139,15 @@ export function CommitAnimation() {
                 r={r * scale}
                 fill={node.color}
                 stroke="var(--color-background)"
-                strokeWidth={2}
+                strokeWidth={2.5}
               />
               {node.label && (
                 <text
                   x={node.x}
-                  y={node.y - r - 6}
+                  y={node.y - r - 8}
                   textAnchor="middle"
-                  className="text-[10px] fill-muted-foreground"
+                  fontSize={14}
+                  className="fill-muted-foreground"
                   style={{ fontFamily: "var(--font-geist-mono), monospace", opacity: Math.min((age - 100) / 200, 1) }}
                 >
                   {node.label}
@@ -156,9 +157,10 @@ export function CommitAnimation() {
               {isMerge && age > 300 && (
                 <text
                   x={node.x}
-                  y={node.y + 22}
+                  y={node.y + 28}
                   textAnchor="middle"
-                  className="text-[9px] font-medium"
+                  fontSize={13}
+                  className="font-medium"
                   style={{
                     fill: "var(--color-accent)",
                     fontFamily: "var(--font-sans)",
@@ -177,16 +179,16 @@ export function CommitAnimation() {
           const node = nodeById(ptr.nodeId);
           const age = elapsed - ptr.delay;
           const opacity = Math.min(age / 300, 1);
-          const xOff = ptr.side === "left" ? -50 : 50;
+          const xOff = ptr.side === "left" ? -65 : 65;
           const tx = node.x + xOff;
 
           return (
             <g key={`${ptr.label}-${ptr.nodeId}`} opacity={opacity}>
               {/* Line from label to node */}
               <line
-                x1={tx + (ptr.side === "left" ? 20 : -20)}
+                x1={tx + (ptr.side === "left" ? 24 : -24)}
                 y1={node.y}
-                x2={node.x + (ptr.side === "left" ? -8 : 8)}
+                x2={node.x + (ptr.side === "left" ? -10 : 10)}
                 y2={node.y}
                 stroke={ptr.color}
                 strokeWidth={1}
@@ -196,9 +198,10 @@ export function CommitAnimation() {
               {/* Label */}
               <text
                 x={tx}
-                y={node.y + 3.5}
+                y={node.y + 4.5}
                 textAnchor="middle"
-                className="text-[10px] font-medium"
+                fontSize={14}
+                className="font-medium"
                 style={{
                   fill: ptr.color,
                   fontFamily: "var(--font-sans)",
