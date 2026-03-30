@@ -117,8 +117,25 @@ function ContractEditor({ contractId }: { contractId: string }) {
     if (!hasChanges || !user || !myParticipant || content === null) return;
     setSaving(true);
 
+    let msg = commitMsg.trim();
+    if (!msg) {
+      try {
+        const res = await fetch("/api/commit-message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            oldContent: headCommit?.content ?? "",
+            newContent: content,
+          }),
+        });
+        const data = await res.json();
+        msg = data.message || "Update contract";
+      } catch {
+        msg = "Update contract";
+      }
+    }
+
     const newCommitId = id();
-    const msg = commitMsg.trim() || "Update contract";
 
     const txs = [
       db.tx.commits[newCommitId]
@@ -150,7 +167,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
     setCommitMsg("");
     setSaving(false);
     setMode("view");
-  }, [hasChanges, user, myParticipant, content, commitMsg, contractId, myHeadCommitId]);
+  }, [hasChanges, user, myParticipant, content, commitMsg, contractId, myHeadCommitId, headCommit]);
 
   async function handleNameSave() {
     const trimmed = nameValue.trim();
