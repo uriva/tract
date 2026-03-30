@@ -26,6 +26,7 @@ interface ParticipantListProps {
   currentUserId: string;
   contractId: string;
   myHeadCommitId?: string;
+  onSelectVersion?: (commitId: string) => void;
 }
 
 export function ParticipantList({
@@ -34,6 +35,7 @@ export function ParticipantList({
   currentUserId,
   contractId,
   myHeadCommitId,
+  onSelectVersion,
 }: ParticipantListProps) {
   const me = participants.find(
     (p) => p.user?.id === currentUserId
@@ -105,7 +107,11 @@ export function ParticipantList({
           <div key={p.id} className="flex items-center justify-between gap-2 py-1">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0" />
-              <span className="text-sm truncate" title={p.email || undefined}>{displayName(p.email, p.user?.id)}</span>
+              <span
+                className={`text-sm truncate ${p.headCommitId && onSelectVersion ? "cursor-pointer hover:text-accent transition-colors" : ""}`}
+                title={p.email || undefined}
+                onClick={() => p.headCommitId && onSelectVersion?.(p.headCommitId)}
+              >{displayName(p.email, p.user?.id)}</span>
               <Badge variant="secondary" className="text-[10px] shrink-0">
                 {p.role}
               </Badge>

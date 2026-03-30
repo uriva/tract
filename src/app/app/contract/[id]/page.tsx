@@ -552,6 +552,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
             currentUserId={user?.id ?? ""}
             contractId={contractId}
             myHeadCommitId={myHeadCommitId}
+            onSelectVersion={handleSelectCommit}
           />
 
           <Separator />
