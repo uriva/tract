@@ -524,7 +524,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                   version
                   {approvers.length === participants.length && participants.length >= 2 && (
                     <Badge variant="default" className="text-[10px] bg-green-600/90 text-white ml-1">
-                      Consensus
+                      🎉 Consensus
                     </Badge>
                   )}
                 </div>
