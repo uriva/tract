@@ -50,14 +50,26 @@ function CompareView({
     approvedCount: number,
     totalCount: number
   ) {
-    if (!user || !myParticipant || !myHead) return;
+    if (!user || !myParticipant || !myHead || !theirHead) return;
     setApplying(true);
 
+    // Fast-forward: if the merged content matches their version exactly,
+    // just move our head pointer to their commit instead of creating a new one.
+    // This ensures both participants end up on the same commit ("in agreement").
+    if (newContent === theirHead.content) {
+      await db.transact([
+        db.tx.participants[myParticipant.id].update({
+          headCommitId: theirHead.id,
+        }),
+      ]);
+      setApplying(false);
+      router.push(`/app/contract/${contractId}`);
+      return;
+    }
+
+    // Partial merge: create a new commit with the selectively merged content.
     const newCommitId = id();
-    const message =
-      approvedCount === totalCount
-        ? `Accept all changes from ${displayName(theirParticipant?.email, theirParticipant?.user?.id)}`
-        : `Accept ${approvedCount}/${totalCount} changes from ${displayName(theirParticipant?.email, theirParticipant?.user?.id)}`;
+    const message = `Accept ${approvedCount}/${totalCount} changes from ${displayName(theirParticipant?.email, theirParticipant?.user?.id)}`;
 
     await db.transact([
       db.tx.commits[newCommitId]
