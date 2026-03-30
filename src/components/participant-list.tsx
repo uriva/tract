@@ -69,8 +69,7 @@ export function ParticipantList({
 
       {me && (
         <div className="flex items-center justify-between py-1">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-accent" />
+           <div className="flex items-center gap-2">
             <span
               className={`text-sm ${me.headCommitId && onSelectVersion ? "cursor-pointer hover:text-accent transition-colors" : ""}`}
               onClick={() => me.headCommitId && onSelectVersion?.(me.headCommitId)}
@@ -109,7 +108,6 @@ export function ParticipantList({
         return (
           <div key={p.id} className="flex items-center justify-between gap-2 py-1">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0" />
               <span
                 className={`text-sm truncate ${p.headCommitId && onSelectVersion ? "cursor-pointer hover:text-accent transition-colors" : ""}`}
                 title={p.email || undefined}
