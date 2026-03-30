@@ -8,12 +8,15 @@ import { Label } from "@/components/ui/label";
 
 type AuthStep = "email" | "code";
 
+const GUEST_TIMEOUT_MS = 15_000;
+
 export function LoginForm() {
   const [step, setStep] = useState<AuthStep>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -71,7 +74,7 @@ export function LoginForm() {
             />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={sending}>
+          <Button type="submit" className="w-full" disabled={sending || guestLoading}>
             {sending ? "Sending..." : "Continue with email"}
           </Button>
           <div className="relative">
@@ -86,19 +89,35 @@ export function LoginForm() {
             type="button"
             variant="outline"
             className="w-full"
-            disabled={sending}
+            disabled={sending || guestLoading}
             onClick={async () => {
-              setSending(true);
+              setError(null);
+              setGuestLoading(true);
               try {
-                await db.auth.signInAsGuest();
-              } catch {
-                setError("Failed to sign in as guest.");
-              } finally {
-                setSending(false);
+                const result = await Promise.race([
+                  db.auth.signInAsGuest(),
+                  new Promise((_, reject) =>
+                    setTimeout(
+                      () => reject(new Error("timeout")),
+                      GUEST_TIMEOUT_MS,
+                    ),
+                  ),
+                ]);
+                // If we get here, auth succeeded — component will unmount
+                // when AuthGate detects the user.
+                console.log("[tract] guest sign-in succeeded", result);
+              } catch (err) {
+                console.error("[tract] guest sign-in failed", err);
+                setError(
+                  err instanceof Error && err.message === "timeout"
+                    ? "Guest sign-in timed out. Please try again."
+                    : "Failed to sign in as guest. Please try again.",
+                );
+                setGuestLoading(false);
               }
             }}
           >
-            Try as guest
+            {guestLoading ? "Signing in..." : "Try as guest"}
           </Button>
         </form>
       ) : (
