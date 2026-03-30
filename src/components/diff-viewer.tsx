@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import { computeLineDiffs, applySelectedChanges, pairWordDiffs, LineDiff, type WordSegment } from "@/lib/diff";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface DiffViewerProps {
   myContent: string;
@@ -72,7 +71,7 @@ export function DiffViewer({
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="flex items-center justify-between">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground">
             {changedIndices.length} change{changedIndices.length !== 1 ? "s" : ""} &middot;{" "}
@@ -108,7 +107,7 @@ export function DiffViewer({
       </div>
 
       {/* Diff lines */}
-      <ScrollArea className="max-h-[600px] rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border">
         <div className="font-mono text-sm">
           {diffs.map((diff, i) => (
             <DiffLine
@@ -121,7 +120,7 @@ export function DiffViewer({
             />
           ))}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
