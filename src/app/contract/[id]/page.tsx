@@ -14,6 +14,7 @@ import { AppShell } from "@/components/app-shell";
 import { ParticipantList } from "@/components/participant-list";
 import { CommitLog } from "@/components/commit-log";
 import { InviteDialog } from "@/components/invite-dialog";
+import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
 
 type Mode = "view" | "edit";
@@ -22,6 +23,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const { user } = db.useAuth();
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [tractOpen, setTractOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<Mode>("view");
@@ -162,6 +164,24 @@ function ContractEditor({ contractId }: { contractId: string }) {
     setEditingName(false);
   }
 
+  // Tract AI creates a commit parented on the user's current version
+  async function handleTractCommit(newContent: string, message: string) {
+    if (!myParticipant || !myHeadCommitId) return;
+    const newCommitId = id();
+    await db.transact([
+      db.tx.commits[newCommitId]
+        .update({
+          content: newContent,
+          message,
+          createdAt: Date.now(),
+        })
+        .link({ contract: contractId })
+        .link({ parent: myHeadCommitId }),
+    ]);
+    // Don't move anyone's pointer — Tract has no version.
+    // The commit just exists in the DAG for anyone to adopt.
+  }
+
   if (isLoading || !contract) {
     return <div className="text-sm text-muted-foreground">Loading...</div>;
   }
@@ -182,6 +202,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
   // The content to display: edit buffer if editing, otherwise the active commit's content
   const displayContent =
     mode === "edit" ? (content ?? "") : (activeCommit?.content ?? "");
+
+  // Who approves the currently displayed version?
+  const approvers = activeCommitId
+    ? participants.filter((p) => p.headCommitId === activeCommitId)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -215,8 +240,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
           <div className="flex items-center gap-2 mt-1">
             <p className="text-xs text-muted-foreground font-mono">
               {isViewingHistory
-                ? `Viewing: ${activeCommitId?.slice(0, 7)} (not your HEAD)`
-                : `HEAD: ${myHeadCommitId?.slice(0, 7) ?? "none"}`}
+                ? `Viewing: ${activeCommitId?.slice(0, 7)} (not your current version)`
+                : `Your version: ${myHeadCommitId?.slice(0, 7) ?? "none"}`}
             </p>
             {participants.length >= 2 && (
               <Badge
@@ -257,9 +282,12 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 setMode("view");
               }}
             >
-              Back to HEAD
+              Back to your version
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setTractOpen(true)}>
+            Ask Tract
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
             Invite
           </Button>
@@ -297,8 +325,27 @@ function ContractEditor({ contractId }: { contractId: string }) {
               )}
             </>
           ) : (
-            <div className="min-h-[500px] p-6 rounded-lg border border-border bg-card">
-              <MarkdownView content={displayContent} />
+            <div className="space-y-3">
+              {/* Approval indicator */}
+              {approvers.length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500/80" />
+                  {approvers.map((p) => {
+                    const isMe = p.user?.id === user?.id;
+                    return isMe ? "You" : (p.email?.split("@")[0] ?? p.email);
+                  }).join(", ")}{" "}
+                  {approvers.length === 1 ? "approves" : "approve"} this version
+                  {approvers.length === participants.length && participants.length >= 2 && (
+                    <Badge variant="default" className="text-[10px] bg-green-600/90 text-white ml-1">
+                      Consensus
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              <div className="min-h-[500px] p-6 rounded-lg border border-border bg-card">
+                <MarkdownView content={displayContent} />
+              </div>
             </div>
           )}
         </div>
@@ -318,6 +365,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
             commits={commits}
             headCommitId={myHeadCommitId}
             viewingCommitId={activeCommitId}
+            participants={participants}
+            currentUserId={user?.id ?? ""}
             onSelectCommit={handleSelectCommit}
             onCheckout={handleCheckout}
           />
@@ -328,6 +377,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
         contractId={contractId}
         open={inviteOpen}
         onOpenChange={setInviteOpen}
+      />
+
+      <TractDialog
+        open={tractOpen}
+        onOpenChange={setTractOpen}
+        contractName={contract.name}
+        currentContent={headCommit?.content ?? ""}
+        onCommit={handleTractCommit}
       />
     </div>
   );

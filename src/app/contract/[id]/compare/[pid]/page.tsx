@@ -128,13 +128,13 @@ function CompareView({
       {/* Version info */}
       <div className="grid grid-cols-2 gap-4">
         <div className="p-3 rounded-lg border border-border bg-card">
-          <div className="text-xs text-muted-foreground">Your HEAD</div>
+          <div className="text-xs text-muted-foreground">Your version</div>
           <div className="text-xs font-mono mt-1">{myHead.id.slice(0, 7)}</div>
           <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
         </div>
         <div className="p-3 rounded-lg border border-border bg-card">
           <div className="text-xs text-muted-foreground">
-            {theirParticipant.email}&apos;s HEAD
+            {theirParticipant.email}&apos;s version
           </div>
           <div className="text-xs font-mono mt-1">{theirHead.id.slice(0, 7)}</div>
           <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
