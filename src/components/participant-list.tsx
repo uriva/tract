@@ -16,6 +16,7 @@ interface Participant {
 interface Commit {
   id: string;
   createdAt: number;
+  parent?: { id: string };
 }
 
 interface ParticipantListProps {
@@ -41,9 +42,21 @@ export function ParticipantList({
   );
 
   const commitMap = new Map(commits.map((c) => [c.id, c]));
-  const myCommitTime = myHeadCommitId
-    ? commitMap.get(myHeadCommitId)?.createdAt ?? 0
-    : 0;
+
+  // Walk ancestors of a commit to build a set of all ancestor IDs
+  function ancestors(commitId: string): Set<string> {
+    const visited = new Set<string>();
+    let cur = commitId;
+    while (cur) {
+      visited.add(cur);
+      const parent = commitMap.get(cur)?.parent?.id;
+      if (!parent || visited.has(parent)) break;
+      cur = parent;
+    }
+    return visited;
+  }
+
+  const myAncestors = myHeadCommitId ? ancestors(myHeadCommitId) : new Set<string>();
 
   return (
     <div className="space-y-3">
@@ -67,11 +80,25 @@ export function ParticipantList({
 
       {others.map((p) => {
         const theirHead = p.headCommitId;
-        const hasDivergence = myHeadCommitId && theirHead && myHeadCommitId !== theirHead;
-        const theirCommitTime = theirHead
-          ? commitMap.get(theirHead)?.createdAt ?? 0
-          : 0;
-        const theyAreAhead = theirCommitTime > myCommitTime;
+        const sameCommit = myHeadCommitId && theirHead && myHeadCommitId === theirHead;
+
+        // Determine relationship by walking the DAG
+        let status: "agreement" | "has-notes" | "yet-to-approve" | "diverged" | "unknown" = "unknown";
+        if (sameCommit) {
+          status = "agreement";
+        } else if (myHeadCommitId && theirHead) {
+          const theirAncestors = ancestors(theirHead);
+          const theyDescendFromMe = theirAncestors.has(myHeadCommitId);
+          const iDescendFromThem = myAncestors.has(theirHead);
+
+          if (theyDescendFromMe) {
+            status = "has-notes"; // they're ahead of me
+          } else if (iDescendFromThem) {
+            status = "yet-to-approve"; // they're behind me
+          } else {
+            status = "diverged"; // parallel branches
+          }
+        }
 
         return (
           <div key={p.id} className="flex items-center justify-between gap-2 py-1">
@@ -83,7 +110,7 @@ export function ParticipantList({
               </Badge>
             </div>
 
-            {hasDivergence && theyAreAhead && (
+            {status === "has-notes" && (
               <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
                 <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap">
                   has notes
@@ -91,11 +118,19 @@ export function ParticipantList({
               </Link>
             )}
 
-            {hasDivergence && !theyAreAhead && (
+            {status === "diverged" && (
+              <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
+                <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap">
+                  diverged
+                </Button>
+              </Link>
+            )}
+
+            {status === "yet-to-approve" && (
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">yet to approve</span>
             )}
 
-            {!hasDivergence && theirHead && (
+            {status === "agreement" && (
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">in agreement</span>
             )}
           </div>

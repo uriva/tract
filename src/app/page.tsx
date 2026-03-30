@@ -207,8 +207,14 @@ export default function HomePage() {
       </main>
 
       <footer className="border-t border-border">
-        <div className="max-w-5xl mx-auto px-6 py-6 text-xs text-muted-foreground">
-          Tract
+        <div className="max-w-5xl mx-auto px-6 py-6 flex items-center gap-4 text-xs text-muted-foreground">
+          <span>Tract</span>
+          <a href="/privacy" className="hover:text-foreground transition-colors">
+            Privacy
+          </a>
+          <a href="/terms" className="hover:text-foreground transition-colors">
+            Terms
+          </a>
         </div>
       </footer>
 

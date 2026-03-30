@@ -51,7 +51,56 @@ interface LayoutNode {
 function buildLayout(commits: Commit[]): LayoutNode[] {
   if (commits.length === 0) return [];
 
-  const sorted = [...commits].sort((a, b) => b.createdAt - a.createdAt);
+  // Build adjacency: parent → children
+  const childrenOf = new Map<string, Commit[]>();
+  const commitById = new Map<string, Commit>();
+  const roots: Commit[] = [];
+
+  for (const c of commits) {
+    commitById.set(c.id, c);
+    if (!c.parent?.id) {
+      roots.push(c);
+    } else {
+      const arr = childrenOf.get(c.parent.id) ?? [];
+      arr.push(c);
+      childrenOf.set(c.parent.id, arr);
+    }
+  }
+
+  // Topological sort: DFS from tips (leaf commits) walking backwards,
+  // keeping each branch contiguous. We find all tips (commits with no children),
+  // sort tips by newest first, then for each tip walk down to the fork point.
+  const hasChildren = new Set<string>();
+  for (const c of commits) {
+    if (c.parent?.id) hasChildren.add(c.parent.id);
+  }
+  const tips = commits
+    .filter((c) => !hasChildren.has(c.id))
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  const sorted: Commit[] = [];
+  const visited = new Set<string>();
+
+  for (const tip of tips) {
+    // Walk from tip to root, collecting unvisited commits
+    const branch: Commit[] = [];
+    let cur: Commit | undefined = tip;
+    while (cur && !visited.has(cur.id)) {
+      branch.push(cur);
+      visited.add(cur.id);
+      cur = cur.parent?.id ? commitById.get(cur.parent.id) : undefined;
+    }
+    sorted.push(...branch);
+  }
+
+  // Any remaining commits (shouldn't happen, but safety)
+  for (const c of commits) {
+    if (!visited.has(c.id)) {
+      sorted.push(c);
+      visited.add(c.id);
+    }
+  }
+
   const idToRow = new Map<string, number>();
   sorted.forEach((c, i) => idToRow.set(c.id, i));
 
@@ -62,48 +111,21 @@ function buildLayout(commits: Commit[]): LayoutNode[] {
     if (pid) childCount.set(pid, (childCount.get(pid) ?? 0) + 1);
   }
 
-  // Assign lanes: walk top-down, inherit parent's lane for first child,
-  // allocate new lane for subsequent children
-  const lanes: number[] = new Array(sorted.length).fill(0);
-  let nextLane = 1;
-
-  // First pass: find root(s) and assign lane 0
-  const parentOf = new Map<string, string>();
-  for (const c of sorted) {
-    if (c.parent?.id) parentOf.set(c.id, c.parent.id);
-  }
-
-  // Track which lane a commit occupies
+  // Assign lanes: walk in display order (top to bottom).
+  // Each tip starts on its own lane. A commit inherits its child's lane
+  // unless it's a fork point (multiple children), in which case it takes
+  // the lane of the first child encountered.
   const commitLane = new Map<string, number>();
+  let nextLane = 0;
 
-  // Process in reverse chronological order (newest first in display = row 0)
-  // But for lane assignment, we go oldest first (bottom up)
-  const oldest = [...sorted].reverse();
-  for (const c of oldest) {
+  for (const c of sorted) {
+    if (!commitLane.has(c.id)) {
+      commitLane.set(c.id, nextLane++);
+    }
+    const myLane = commitLane.get(c.id)!;
     const pid = c.parent?.id;
-    if (!pid) {
-      // Root commit gets lane 0
-      commitLane.set(c.id, 0);
-    } else {
-      const parentLaneVal = commitLane.get(pid) ?? 0;
-      const siblings = (childCount.get(pid) ?? 1);
-      if (siblings <= 1) {
-        // Only child — inherit parent lane
-        commitLane.set(c.id, parentLaneVal);
-      } else {
-        // Multiple children — first gets parent lane, rest get new lanes
-        if (!commitLane.has(c.id)) {
-          // Check if parent lane is already taken by an earlier sibling
-          const parentTaken = [...commitLane.entries()].some(
-            ([id, l]) => l === parentLaneVal && parentOf.get(id) === pid && id !== c.id
-          );
-          if (parentTaken) {
-            commitLane.set(c.id, nextLane++);
-          } else {
-            commitLane.set(c.id, parentLaneVal);
-          }
-        }
-      }
+    if (pid && !commitLane.has(pid)) {
+      commitLane.set(pid, myLane);
     }
   }
 
