@@ -640,6 +640,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
       <InviteDialog
         contractId={contractId}
+        myHeadCommitId={myHeadCommitId}
         open={inviteOpen}
         onOpenChange={setInviteOpen}
       />
