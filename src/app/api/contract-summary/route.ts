@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { contractId } = await req.json();
+  const { contractId, force } = await req.json();
   if (!contractId) {
     return NextResponse.json(
       { error: "contractId is required" },
@@ -41,8 +41,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Contract not found" }, { status: 404 });
   }
 
-  // Check cache — return existing summary if less than 1 hour old
+  // Check cache — return existing summary if less than 1 hour old (unless forced)
   if (
+    !force &&
     contract.summary &&
     contract.summaryGeneratedAt &&
     Date.now() - contract.summaryGeneratedAt < ONE_HOUR

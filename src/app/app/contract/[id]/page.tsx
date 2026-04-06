@@ -96,10 +96,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
   useEffect(() => {
     if (!contractId || isLoading) return;
-    // Only call the API if there's no summary stored yet (first time)
-    if (!contract?.summary && !summaryFetchedRef.current) {
+    // Call the API if there's no summary, or if it's older than 1 hour
+    const stale =
+      !contract?.summary ||
+      !contract?.summaryGeneratedAt ||
+      Date.now() - (contract.summaryGeneratedAt as number) > 60 * 60 * 1000;
+    if (stale && !summaryFetchedRef.current) {
       summaryFetchedRef.current = true;
-      setSummaryLoading(true);
+      if (!contract?.summary) setSummaryLoading(true);
       fetch("/api/contract-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,7 +112,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         .catch(() => {})
         .finally(() => setSummaryLoading(false));
     }
-  }, [contractId, isLoading, contract?.summary]);
+  }, [contractId, isLoading, contract?.summary, contract?.summaryGeneratedAt]);
 
   // Regenerate summary after new commits
   useEffect(() => {
@@ -122,7 +126,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
       fetch("/api/contract-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractId }),
+        body: JSON.stringify({ contractId, force: true }),
       }).catch(() => {});
     }
   }, [commits.length, contractId]);
