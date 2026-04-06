@@ -8,6 +8,8 @@ const _schema = i.schema({
     contracts: i.entity({
       name: i.string(),
       createdAt: i.number().indexed(),
+      summary: i.string().optional(),
+      summaryGeneratedAt: i.number().optional(),
     }),
     commits: i.entity({
       content: i.string(),

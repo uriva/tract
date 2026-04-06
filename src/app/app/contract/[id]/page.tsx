@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, use } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
@@ -85,6 +85,62 @@ function ContractEditor({ contractId }: { contractId: string }) {
     ? commits.find((c) => c.id === activeCommit.parent!.id) ?? null
     : null;
   const isViewingHistory = viewingCommitId !== null && viewingCommitId !== myHeadCommitId;
+
+  // Contract summary (AI-generated, cached hourly)
+  const [summary, setSummary] = useState<{ text: string; generatedAt: number } | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const summaryFetchedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!contractId || summaryFetchedRef.current === contractId) return;
+    summaryFetchedRef.current = contractId;
+    setSummaryLoading(true);
+    fetch("/api/contract-summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contractId }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.summary) {
+          setSummary({ text: data.summary, generatedAt: data.generatedAt });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSummaryLoading(false));
+  }, [contractId]);
+
+  // Refresh summary after commits (re-fetch, API handles hourly caching)
+  const commitCountRef = useRef(commits.length);
+  useEffect(() => {
+    if (commits.length > commitCountRef.current && commits.length > 0) {
+      commitCountRef.current = commits.length;
+      fetch("/api/contract-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contractId }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.summary) {
+            setSummary({ text: data.summary, generatedAt: data.generatedAt });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [commits.length, contractId]);
+
+  // Walk ancestry from active commit to root
+  const versionHistory = useMemo(() => {
+    const commitMap = new Map(commits.map((c) => [c.id, c]));
+    const chain: typeof commits = [];
+    let current = activeCommitId ? commitMap.get(activeCommitId) : undefined;
+    while (current) {
+      chain.push(current);
+      current = current.parent?.id ? commitMap.get(current.parent.id) : undefined;
+    }
+    return chain;
+  }, [commits, activeCommitId]);
 
   // Consensus: all participants point to the same commit
   const [editingName, setEditingName] = useState(false);
@@ -565,9 +621,20 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 </div>
               )}
 
-              {/* Last commit note */}
-              {activeCommit?.message && !isViewingHistory && (
-                <p className="text-xs text-muted-foreground px-1 italic">{activeCommit.message}</p>
+              {/* Contract summary (AI-generated, hourly) */}
+              {!isViewingHistory && (summary || summaryLoading) && (
+                <div className="text-xs text-muted-foreground px-1 space-y-1">
+                  {summaryLoading && !summary ? (
+                    <p className="italic">Generating summary...</p>
+                  ) : summary ? (
+                    <>
+                      <p>{summary.text}</p>
+                      <p className="text-[10px] text-muted-foreground/60">
+                        Generated {new Date(summary.generatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · refreshes hourly
+                      </p>
+                    </>
+                  ) : null}
+                </div>
               )}
 
               {/* Adopt bar — shown when viewing a historical commit */}
@@ -601,7 +668,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
               <div className="relative min-h-[500px] px-8 py-6 rounded-lg border border-border bg-card">
                 {mode === "view" && displayContent.trim() && (
                   <button
-                    className="absolute top-3 end-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute top-3 start-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     onClick={() => {
                       navigator.clipboard.writeText(displayContent);
                       setCopied(true);
@@ -620,6 +687,38 @@ function ContractEditor({ contractId }: { contractId: string }) {
                   <MarkdownView content={displayContent} />
                 )}
               </div>
+
+              {/* History for this version */}
+              {versionHistory.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    History for this version
+                  </h3>
+                  <div className="space-y-1">
+                    {versionHistory.map((c) => {
+                      const authorLabel = c.author?.email
+                        ? displayName(c.author.email)
+                        : "Tract";
+                      const date = new Date(c.createdAt);
+                      return (
+                        <div key={c.id} className="text-xs text-muted-foreground py-1.5 border-b border-border/50 last:border-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px]">{c.id.slice(0, 7)}</span>
+                            <span title={c.author?.email || undefined}>{authorLabel}</span>
+                            <span className="text-muted-foreground/50">·</span>
+                            <span className="text-muted-foreground/50">
+                              {date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                            </span>
+                          </div>
+                          {c.message && (
+                            <p className="mt-0.5 text-foreground/70 whitespace-pre-wrap">{c.message}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
