@@ -597,7 +597,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 </div>
               )}
 
-              <div className="min-h-[500px] p-6 rounded-lg border border-border bg-card">
+              <div className="min-h-[500px] px-8 py-6 rounded-lg border border-border bg-card">
                 {isViewingHistory ? (
                   <InlineDiffView
                     baseContent={headCommit?.content ?? ""}
