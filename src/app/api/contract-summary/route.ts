@@ -9,8 +9,6 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemi
 
 const adminDb = init({ appId: APP_ID, adminToken: ADMIN_TOKEN, schema });
 
-const ONE_HOUR = 60 * 60 * 1000;
-
 export async function POST(req: NextRequest) {
   if (!GEMINI_API_KEY) {
     return NextResponse.json(
@@ -19,7 +17,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { contractId, force } = await req.json();
+  const { contractId } = await req.json();
   if (!contractId) {
     return NextResponse.json(
       { error: "contractId is required" },
@@ -39,20 +37,6 @@ export async function POST(req: NextRequest) {
   const contract = result?.contracts?.[0];
   if (!contract) {
     return NextResponse.json({ error: "Contract not found" }, { status: 404 });
-  }
-
-  // Check cache — return existing summary if less than 1 hour old (unless forced)
-  if (
-    !force &&
-    contract.summary &&
-    contract.summaryGeneratedAt &&
-    Date.now() - contract.summaryGeneratedAt < ONE_HOUR
-  ) {
-    return NextResponse.json({
-      summary: contract.summary,
-      generatedAt: contract.summaryGeneratedAt,
-      cached: true,
-    });
   }
 
   // Build context for LLM

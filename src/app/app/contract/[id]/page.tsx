@@ -86,33 +86,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
     : null;
   const isViewingHistory = viewingCommitId !== null && viewingCommitId !== myHeadCommitId;
 
-  // Contract summary — read from InstantDB, generate only if missing or after new commits
+  // Contract summary — read from InstantDB, regenerate only after new commits
   const summary = contract?.summary
     ? { text: contract.summary as string, generatedAt: contract.summaryGeneratedAt as number }
     : null;
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const summaryFetchedRef = useRef(false);
   const commitCountRef = useRef(0);
-
-  useEffect(() => {
-    if (!contractId || isLoading) return;
-    // Call the API if there's no summary, or if it's older than 1 hour
-    const stale =
-      !contract?.summary ||
-      !contract?.summaryGeneratedAt ||
-      Date.now() - (contract.summaryGeneratedAt as number) > 60 * 60 * 1000;
-    if (stale && !summaryFetchedRef.current) {
-      summaryFetchedRef.current = true;
-      if (!contract?.summary) setSummaryLoading(true);
-      fetch("/api/contract-summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractId }),
-      })
-        .catch(() => {})
-        .finally(() => setSummaryLoading(false));
-    }
-  }, [contractId, isLoading, contract?.summary, contract?.summaryGeneratedAt]);
 
   // Regenerate summary after new commits
   useEffect(() => {
@@ -623,13 +601,9 @@ function ContractEditor({ contractId }: { contractId: string }) {
               )}
 
               {/* Contract summary (AI-generated) */}
-              {!isViewingHistory && (summary || summaryLoading) && (
-                <div className="text-xs text-muted-foreground px-1 space-y-1">
-                  {summaryLoading && !summary ? (
-                    <p className="italic">Generating summary...</p>
-                  ) : summary ? (
-                    <p>{summary.text}</p>
-                  ) : null}
+              {!isViewingHistory && summary && (
+                <div className="text-xs text-muted-foreground px-1">
+                  <p>{summary.text}</p>
                 </div>
               )}
 
