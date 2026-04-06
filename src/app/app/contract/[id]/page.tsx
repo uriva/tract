@@ -30,6 +30,30 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SignDialog } from "@/components/sign-dialog";
 import { displayName, assignParticipantColors } from "@/lib/utils";
 
+const SUMMARY_TRUNCATE = 180;
+
+function CollapsibleSummary({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const needsTruncation = text.length > SUMMARY_TRUNCATE;
+  const displayed = !needsTruncation || expanded ? text : text.slice(0, SUMMARY_TRUNCATE).trimEnd() + "…";
+
+  return (
+    <div className="text-xs text-muted-foreground px-1">
+      <p>
+        {displayed}
+        {needsTruncation && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="ml-1 text-accent-foreground/70 hover:text-accent-foreground underline underline-offset-2 cursor-pointer"
+          >
+            {expanded ? "show less" : "show more"}
+          </button>
+        )}
+      </p>
+    </div>
+  );
+}
+
 type Mode = "view" | "edit";
 
 function ContractEditor({ contractId }: { contractId: string }) {
@@ -602,9 +626,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
               {/* Contract summary (AI-generated) */}
               {!isViewingHistory && summary && (
-                <div className="text-xs text-muted-foreground px-1">
-                  <p>{summary.text}</p>
-                </div>
+                <CollapsibleSummary text={summary.text} />
               )}
 
               {/* Adopt bar — shown when viewing a historical commit */}

@@ -80,16 +80,16 @@ export async function POST(req: NextRequest) {
         ? `There are ${headIds.size} different versions among participants.`
         : "";
 
-  const prompt = `Summarize the current state of this collaborative document for its participants.
+  const prompt = `Write a brief summary of what's happening with this collaborative document. Focus on the latest events — who did what recently and where things stand now.
 
-Contract name: "${contract.name}"
+Document: "${contract.name}"
 
 Participants and their versions:
 ${participantSummaries.join("\n\n")}
 
 ${agreementNote}
 
-Write exactly 2-4 sentences. Describe what state the document is in, what each person changed, and whether they agree or have diverging versions. Use short first names (the part before @ in their email). No markdown. No quotes. Just the summary text.`;
+Keep it short and direct. Emphasize recent activity and who made which changes. Use first names (part before @ in emails). Plain text only, no markdown or quotes.`;
 
   const res = await fetch(GEMINI_URL, {
     method: "POST",
@@ -100,7 +100,6 @@ Write exactly 2-4 sentences. Describe what state the document is in, what each p
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 300,
       },
     }),
   });
