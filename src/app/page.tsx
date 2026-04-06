@@ -47,14 +47,15 @@ export default function HomePage() {
           <div className="grid md:grid-cols-[1fr_auto] gap-12 md:gap-16 items-center">
             <div className="max-w-lg space-y-6 page-enter">
               <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.1]">
-                Contracts that track
+                Documents that track
                 <br />
                 every change.
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                Tract brings version control to contract negotiation. Every edit
-                is a commit. Every participant has their own version. Approve
-                changes line by line until everyone agrees.
+                Tract brings version control to collaborative writing.
+                Contracts, design docs, proposals, anything where multiple
+                people need to converge on one version. Every edit is a commit.
+                Approve changes line by line until everyone agrees.
               </p>
               <div className="flex items-center gap-3 pt-2">
                 {user ? (
@@ -74,50 +75,74 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Problem / Solution */}
+        {/* Problem: Google Docs isn't enough */}
         <section className="border-t border-border">
           <div className="max-w-5xl mx-auto px-6 py-20">
-            <div className="grid md:grid-cols-2 gap-16">
-              <div className="space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                  The problem
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-8">
+              The problem
+            </p>
+            <h2 className="text-2xl font-semibold tracking-tight mb-6">
+              Google Docs has version history. It&apos;s not enough.
+            </h2>
+            <div className="grid sm:grid-cols-3 gap-10">
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold tracking-tight">
+                  One owner decides
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  In Google Docs, one person owns the document. Everyone else
+                  suggests. The owner accepts or rejects. That works for a memo,
+                  not for a contract where both sides have equal say, or a
+                  design doc where three teams need to sign off.
                 </p>
-                <h2 className="text-2xl font-semibold tracking-tight">
-                  Contract negotiation is chaos.
-                </h2>
-                <div className="space-y-3 text-muted-foreground leading-relaxed">
-                  <p>
-                    You email a draft. They send back changes. Someone else
-                    edits a different version. Now there are three documents
-                    floating around and nobody knows which is current.
-                  </p>
-                  <p>
-                    Tracked changes in Word docs get messy fast. You lose
-                    context about why a clause was changed. There is no clear
-                    picture of who has agreed to what.
-                  </p>
-                </div>
               </div>
-              <div className="space-y-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                  How Tract works
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold tracking-tight">
+                  No independent work
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Everyone edits the same document at the same time. If you want
+                  to try a different direction, you have to copy the doc. Now
+                  you have two files, no way to compare them, and no path to
+                  merge them back together.
                 </p>
-                <h2 className="text-2xl font-semibold tracking-tight">
-                  Git for contracts.
-                </h2>
-                <div className="space-y-3 text-muted-foreground leading-relaxed">
-                  <p>
-                    Every edit creates a new version in a commit history. Each
-                    participant points to the version they currently approve.
-                    You can see exactly where everyone stands at a glance.
-                  </p>
-                  <p>
-                    When someone proposes changes, you review them line by line
-                    &mdash; accept some, reject others, just like a code review.
-                    No more all-or-nothing redlines.
-                  </p>
-                </div>
               </div>
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold tracking-tight">
+                  No clear agreement
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Version history tells you what changed and when. It
+                  doesn&apos;t tell you who has approved which version. When
+                  three people are negotiating a contract or reviewing a
+                  proposal, there&apos;s no way to see where everyone stands.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Solution: How Tract works */}
+        <section className="border-t border-border">
+          <div className="max-w-5xl mx-auto px-6 py-20">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-8">
+              How Tract works
+            </p>
+            <h2 className="text-2xl font-semibold tracking-tight mb-4">
+              Git for documents.
+            </h2>
+            <div className="max-w-2xl space-y-3 text-muted-foreground leading-relaxed">
+              <p>
+                Every edit creates a new version in a commit history. Each
+                participant points to the version they currently approve.
+                You can see exactly where everyone stands at a glance.
+              </p>
+              <p>
+                Anyone can branch off, try a different approach, and propose it
+                back. No one is blocked. When someone proposes changes, you
+                review them line by line, accept some, reject others, just like
+                a code review. No more all-or-nothing redlines.
+              </p>
             </div>
           </div>
         </section>
@@ -133,7 +158,7 @@ export default function HomePage() {
                 {
                   step: "01",
                   title: "Write & commit",
-                  desc: "Draft your contract in markdown. Every save is a versioned commit with a description of what changed.",
+                  desc: "Draft your document in markdown. Every save is a versioned commit with a description of what changed.",
                 },
                 {
                   step: "02",
@@ -186,9 +211,10 @@ export default function HomePage() {
               </h2>
               <p className="text-muted-foreground leading-relaxed">
                 Describe what you want in plain language &mdash; &ldquo;add a
-                termination clause with 30-day notice&rdquo; &mdash; and
-                Tract&apos;s AI writes the revision as a new commit. Review it
-                like any other change and adopt it if you agree.
+                termination clause with 30-day notice&rdquo; or &ldquo;rewrite
+                section 3 to be less ambiguous&rdquo; &mdash; and Tract&apos;s
+                AI writes the revision as a new commit. Review it like any
+                other change and adopt it if you agree.
               </p>
             </div>
           </div>
@@ -201,7 +227,8 @@ export default function HomePage() {
               Stop emailing drafts back and forth.
             </h2>
             <p className="text-muted-foreground mb-6">
-              Free to use. No credit card required.
+              Works for contracts, design docs, proposals, and any document
+              that needs sign-off. Free to use.
             </p>
             {user ? (
               <Button size="lg" onClick={() => router.push("/app")}>
