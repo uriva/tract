@@ -86,47 +86,44 @@ function ContractEditor({ contractId }: { contractId: string }) {
     : null;
   const isViewingHistory = viewingCommitId !== null && viewingCommitId !== myHeadCommitId;
 
-  // Contract summary (AI-generated, cached hourly)
-  const [summary, setSummary] = useState<{ text: string; generatedAt: number } | null>(null);
+  // Contract summary — read from InstantDB, generate only if missing or after new commits
+  const summary = contract?.summary
+    ? { text: contract.summary as string, generatedAt: contract.summaryGeneratedAt as number }
+    : null;
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const summaryFetchedRef = useRef<string | null>(null);
+  const summaryFetchedRef = useRef(false);
+  const commitCountRef = useRef(0);
 
   useEffect(() => {
-    if (!contractId || summaryFetchedRef.current === contractId) return;
-    summaryFetchedRef.current = contractId;
-    setSummaryLoading(true);
-    fetch("/api/contract-summary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contractId }),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.summary) {
-          setSummary({ text: data.summary, generatedAt: data.generatedAt });
-        }
-      })
-      .catch(() => {})
-      .finally(() => setSummaryLoading(false));
-  }, [contractId]);
-
-  // Refresh summary after commits (re-fetch, API handles hourly caching)
-  const commitCountRef = useRef(commits.length);
-  useEffect(() => {
-    if (commits.length > commitCountRef.current && commits.length > 0) {
-      commitCountRef.current = commits.length;
+    if (!contractId || isLoading) return;
+    // Only call the API if there's no summary stored yet (first time)
+    if (!contract?.summary && !summaryFetchedRef.current) {
+      summaryFetchedRef.current = true;
+      setSummaryLoading(true);
       fetch("/api/contract-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contractId }),
       })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data?.summary) {
-            setSummary({ text: data.summary, generatedAt: data.generatedAt });
-          }
-        })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setSummaryLoading(false));
+    }
+  }, [contractId, isLoading, contract?.summary]);
+
+  // Regenerate summary after new commits
+  useEffect(() => {
+    if (!contractId || commits.length === 0) return;
+    if (commitCountRef.current === 0) {
+      commitCountRef.current = commits.length;
+      return;
+    }
+    if (commits.length > commitCountRef.current) {
+      commitCountRef.current = commits.length;
+      fetch("/api/contract-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contractId }),
+      }).catch(() => {});
     }
   }, [commits.length, contractId]);
 
@@ -621,18 +618,13 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 </div>
               )}
 
-              {/* Contract summary (AI-generated, hourly) */}
+              {/* Contract summary (AI-generated) */}
               {!isViewingHistory && (summary || summaryLoading) && (
                 <div className="text-xs text-muted-foreground px-1 space-y-1">
                   {summaryLoading && !summary ? (
                     <p className="italic">Generating summary...</p>
                   ) : summary ? (
-                    <>
-                      <p>{summary.text}</p>
-                      <p className="text-[10px] text-muted-foreground/60">
-                        Generated {new Date(summary.generatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · refreshes hourly
-                      </p>
-                    </>
+                    <p>{summary.text}</p>
                   ) : null}
                 </div>
               )}
