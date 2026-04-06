@@ -166,6 +166,9 @@ export async function POST(req: Request) {
     adminDb.tx.contracts[contractId].update({
       name: "Example: Freelance Design Agreement",
       createdAt: now - 3600_000, // 1 hour ago
+      summary:
+        "Alice and Bob are negotiating a freelance design agreement but have diverging versions. Bob wants to expand the scope to include social media assets, increase the budget to $7,500, and add a confidentiality clause. Alice wants more comprehensive brand guidelines, a late delivery penalty, a heavier back-loaded payment split, and tighter restrictions on portfolio use. Both edits branch from the initial draft, so their changes haven't been reconciled yet.",
+      summaryGeneratedAt: now,
     }),
 
     // Commit 1: initial draft by Alice
