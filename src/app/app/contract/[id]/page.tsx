@@ -44,7 +44,7 @@ function CollapsibleSummary({ text }: { text: string }) {
         {needsTruncation && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="ml-1 text-accent-foreground/70 hover:text-accent-foreground underline underline-offset-2 cursor-pointer"
+            className="ml-1 text-foreground/60 hover:text-foreground underline underline-offset-2 cursor-pointer"
           >
             {expanded ? "show less" : "show more"}
           </button>
