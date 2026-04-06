@@ -47,13 +47,9 @@ export function InviteDialog({
     [commits],
   );
 
-  // Default to inviter's head, fall back to latest commit
-  const effectiveCommitId =
-    selectedCommitId ?? myHeadCommitId ?? sortedCommits[0]?.id;
-
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !effectiveCommitId) return;
+    if (!email.trim() || !selectedCommitId) return;
     setError(null);
     setSending(true);
 
@@ -63,7 +59,7 @@ export function InviteDialog({
         db.tx.participants[participantId]
           .update({
             role: "collaborator",
-            headCommitId: effectiveCommitId,
+            headCommitId: selectedCommitId,
             email: email.trim().toLowerCase(),
             joinedAt: Date.now(),
           })
@@ -97,37 +93,52 @@ export function InviteDialog({
             onChange={(e) => setEmail(e.target.value)}
             autoFocus
           />
-          <div className="space-y-1.5">
-            <label className="text-sm text-muted-foreground">
-              Starting version
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Which version should they start from?
             </label>
-            <select
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              value={effectiveCommitId ?? ""}
-              onChange={(e) => setSelectedCommitId(e.target.value)}
-            >
+            <div className="space-y-1 max-h-48 overflow-y-auto rounded-md border border-border p-1">
               {sortedCommits.map((c) => {
                 const isMyHead = c.id === myHeadCommitId;
                 const authorLabel = c.author?.email
                   ? displayName(c.author.email)
                   : "Tract";
                 const msg = c.message
-                  ? c.message.split("\n")[0].slice(0, 50)
+                  ? c.message.split("\n")[0].slice(0, 60)
                   : "No description";
+                const isSelected = selectedCommitId === c.id;
                 return (
-                  <option key={c.id} value={c.id}>
-                    {c.id.slice(0, 7)} — {msg} ({authorLabel})
-                    {isMyHead ? " ← your version" : ""}
-                  </option>
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedCommitId(c.id)}
+                    className={`w-full text-left px-3 py-2 rounded text-sm cursor-pointer transition-colors ${
+                      isSelected
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-muted"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-muted-foreground">{c.id.slice(0, 7)}</span>
+                      <span className="truncate">{msg}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      by {authorLabel}
+                      {isMyHead && " — your version"}
+                    </div>
+                  </button>
                 );
               })}
-            </select>
+            </div>
+            {!selectedCommitId && (
+              <p className="text-xs text-muted-foreground">Select a version above</p>
+            )}
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
             type="submit"
             className="w-full"
-            disabled={sending || !effectiveCommitId}
+            disabled={sending || !selectedCommitId}
           >
             {sending ? "Inviting..." : "Invite"}
           </Button>

@@ -27,6 +27,8 @@ interface ParticipantListProps {
   contractId: string;
   myHeadCommitId?: string;
   onSelectVersion?: (commitId: string) => void;
+  onRemove?: (participantId: string) => void;
+  isOwner?: boolean;
   colorMap?: Map<string, string>;
 }
 
@@ -37,6 +39,8 @@ export function ParticipantList({
   contractId,
   myHeadCommitId,
   onSelectVersion,
+  onRemove,
+  isOwner,
   colorMap,
 }: ParticipantListProps) {
   const me = participants.find(
@@ -112,7 +116,7 @@ export function ParticipantList({
         }
 
         return (
-          <div key={p.id} className="flex items-center justify-between gap-2 py-1">
+          <div key={p.id} className="group flex items-center justify-between gap-2 py-1">
             <div className="flex items-center gap-2 min-w-0">
               <div
                 className="w-2 h-2 rounded-full shrink-0"
@@ -128,29 +132,44 @@ export function ParticipantList({
               </Badge>
             </div>
 
-            {status === "has-notes" && (
-              <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
-                <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10">
-                  has notes
-                </Button>
-              </Link>
-            )}
+            <div className="flex items-center gap-1">
+              {status === "has-notes" && (
+                <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
+                  <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10">
+                    has notes
+                  </Button>
+                </Link>
+              )}
 
-            {status === "diverged" && (
-              <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
-                <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10">
-                  resolve conflicts
-                </Button>
-              </Link>
-            )}
+              {status === "diverged" && (
+                <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
+                  <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10">
+                    resolve conflicts
+                  </Button>
+                </Link>
+              )}
 
-            {status === "yet-to-approve" && (
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">yet to approve</span>
-            )}
+              {status === "yet-to-approve" && (
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">yet to approve</span>
+              )}
 
-            {status === "agreement" && (
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">in agreement</span>
-            )}
+              {status === "agreement" && (
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">in agreement</span>
+              )}
+
+              {isOwner && onRemove && (
+                <button
+                  onClick={() => onRemove(p.id)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive ml-1 cursor-pointer"
+                  title={`Remove ${displayName(p.email, p.user?.id)}`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         );
       })}

@@ -99,6 +99,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const myParticipant = participants.find(
     (p) => p.user?.id === user?.id
   );
+  const isOwner = contract?.owner?.id === user?.id;
   const myHeadCommitId = myParticipant?.headCommitId;
   const headCommit = commits.find((c) => c.id === myHeadCommitId);
 
@@ -170,6 +171,12 @@ function ContractEditor({ contractId }: { contractId: string }) {
       setViewingCommitId(commitId);
       setMode("view"); // Always view when browsing history
     }
+  }
+
+  // Remove a participant (owner only)
+  async function handleRemoveParticipant(participantId: string) {
+    if (!isOwner) return;
+    await db.transact([db.tx.participants[participantId].delete()]);
   }
 
   // Move HEAD to a different commit
@@ -390,9 +397,17 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
   if (!contract || !myParticipant) {
     return (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Contract not found, or you don&apos;t have access.
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <div className="rounded-full bg-muted p-4">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+        <h2 className="text-lg font-medium">No access to this document</h2>
+        <p className="text-sm text-muted-foreground text-center max-w-sm">
+          This document either doesn&apos;t exist or you haven&apos;t been invited.
+          Make sure you&apos;re signed in with the email the owner used to invite you.
         </p>
         <Button variant="outline" onClick={() => router.push("/app")}>
           Back to dashboard
@@ -724,6 +739,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
             contractId={contractId}
             myHeadCommitId={myHeadCommitId}
             onSelectVersion={handleSelectCommit}
+            onRemove={isOwner ? handleRemoveParticipant : undefined}
+            isOwner={isOwner}
             colorMap={colorMap}
           />
 
