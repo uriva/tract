@@ -44,6 +44,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [saving, setSaving] = useState(false);
   const [commitError, setCommitError] = useState("");
   const [mode, setMode] = useState<Mode>("view");
+  const [copied, setCopied] = useState(false);
   const [viewingCommitId, setViewingCommitId] = useState<string | null>(null);
   const [tractStatus, setTractStatus] = useState<
     | { state: "working"; prompt: string }
@@ -389,6 +390,19 @@ function ContractEditor({ contractId }: { contractId: string }) {
           {mode === "view" && !isViewingHistory && (
             <Button size="sm" variant="outline" onClick={enterEditMode}>
               Edit
+            </Button>
+          )}
+          {mode === "view" && displayContent.trim() && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                navigator.clipboard.writeText(displayContent);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              {copied ? "Copied" : "Copy text"}
             </Button>
           )}
           {mode === "edit" && (
