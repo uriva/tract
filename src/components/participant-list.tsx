@@ -1,8 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import Link from "next/link";
 import { displayName } from "@/lib/utils";
 
@@ -43,6 +52,8 @@ export function ParticipantList({
   isOwner,
   colorMap,
 }: ParticipantListProps) {
+  const [removingParticipant, setRemovingParticipant] = useState<Participant | null>(null);
+
   const me = participants.find(
     (p) => p.user?.id === currentUserId
   );
@@ -159,7 +170,7 @@ export function ParticipantList({
 
               {isOwner && onRemove && (
                 <button
-                  onClick={() => onRemove(p.id)}
+                  onClick={() => setRemovingParticipant(p)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive ml-1 cursor-pointer"
                   title={`Remove ${displayName(p.email, p.user?.id)}`}
                 >
@@ -177,6 +188,34 @@ export function ParticipantList({
       {others.length === 0 && (
         <p className="text-xs text-muted-foreground">No other participants yet.</p>
       )}
+
+      <Dialog open={!!removingParticipant} onOpenChange={(open) => !open && setRemovingParticipant(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove participant</DialogTitle>
+            <DialogDescription>
+              Remove {removingParticipant ? displayName(removingParticipant.email, removingParticipant.user?.id) : ""} from this document? They will lose access.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setRemovingParticipant(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (removingParticipant && onRemove) {
+                  onRemove(removingParticipant.id);
+                }
+                setRemovingParticipant(null);
+              }}
+            >
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
