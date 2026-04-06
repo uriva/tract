@@ -500,6 +500,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 value={content ?? ""}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Start writing your contract..."
+                dir="auto"
                 autoFocus
               />
 

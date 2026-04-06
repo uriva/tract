@@ -44,7 +44,7 @@ export function InlineDiffView({
   }
 
   return (
-    <div className="font-mono text-sm">
+    <div className="font-mono text-sm" dir="auto">
       {diffs.map((diff, i) => {
         if (diff.type === "unchanged") {
           return (

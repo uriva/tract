@@ -145,7 +145,7 @@ function DiffLine({
         <div className="w-12 shrink-0 text-right pr-3 text-muted-foreground/50 select-none">
           {diff.lineNumber}
         </div>
-        <div className="flex-1 px-3 whitespace-pre-wrap break-all">
+        <div className="flex-1 px-3 whitespace-pre-wrap break-all" dir="auto">
           {diff.value || "\u00A0"}
         </div>
       </div>
@@ -179,6 +179,7 @@ function DiffLine({
         className={`flex-1 px-3 whitespace-pre-wrap break-all ${
           isAdded ? "diff-text-added" : "diff-text-removed"
         }`}
+        dir="auto"
       >
         {wordSegments ? (
           wordSegments.map((seg, i) =>

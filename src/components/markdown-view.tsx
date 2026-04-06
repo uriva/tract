@@ -17,7 +17,7 @@ export function MarkdownView({ content }: MarkdownViewProps) {
   }
 
   return (
-    <div className="prose-contract">
+    <div className="prose-contract" dir="auto">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );
