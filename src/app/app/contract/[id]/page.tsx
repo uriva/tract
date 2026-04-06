@@ -392,19 +392,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
               Edit
             </Button>
           )}
-          {mode === "view" && displayContent.trim() && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                navigator.clipboard.writeText(displayContent);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              }}
-            >
-              {copied ? "Copied" : "Copy text"}
-            </Button>
-          )}
           {mode === "edit" && (
             <Button
               size="sm"
@@ -611,7 +598,19 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 </div>
               )}
 
-              <div className="min-h-[500px] px-8 py-6 rounded-lg border border-border bg-card">
+              <div className="relative min-h-[500px] px-8 py-6 rounded-lg border border-border bg-card">
+                {mode === "view" && displayContent.trim() && (
+                  <button
+                    className="absolute top-3 end-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => {
+                      navigator.clipboard.writeText(displayContent);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                  >
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                )}
                 {isViewingHistory ? (
                   <InlineDiffView
                     baseContent={headCommit?.content ?? ""}
