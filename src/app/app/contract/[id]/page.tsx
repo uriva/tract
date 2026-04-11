@@ -770,6 +770,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
         open={tractOpen}
         onOpenChange={setTractOpen}
         onSubmit={handleTractSubmit}
+        isViewingOwnVersion={!isViewingHistory}
+        onGoToOwnVersion={() => setViewingCommitId(null)}
       />
 
       <CommitDetailDialog
