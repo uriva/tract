@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${GEMINI_API_KEY}`;
 
+function extractMessage(data: any): string | undefined {
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+}
+
 export async function POST(req: NextRequest) {
   if (!GEMINI_API_KEY) {
     return NextResponse.json(
@@ -13,6 +17,11 @@ export async function POST(req: NextRequest) {
 
   const { oldContent, newContent } = await req.json();
 
+  // First commit — no need to call the LLM
+  if (!oldContent?.trim()) {
+    return NextResponse.json({ message: "Initial draft" });
+  }
+
   const res = await fetch(GEMINI_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -22,10 +31,10 @@ export async function POST(req: NextRequest) {
           role: "user",
           parts: [
             {
-              text: `You are writing a short commit message (under 10 words, no quotes, no period) summarizing what changed between two versions of a contract.
+              text: `You are writing a short commit message (under 10 words, no quotes, no period) summarizing what changed between two versions of a document.
 
 Previous version:
-${oldContent || "(empty)"}
+${oldContent}
 
 New version:
 ${newContent || "(empty)"}
@@ -52,10 +61,10 @@ Commit message:`,
   }
 
   const data = await res.json();
-  const msg =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  const msg = extractMessage(data);
 
   if (!msg) {
+    console.error("Gemini empty candidates:", JSON.stringify(data));
     return NextResponse.json(
       { error: "Empty response from model" },
       { status: 502 },
