@@ -111,6 +111,56 @@ function ContractEditor({ contractId }: { contractId: string }) {
     : null;
   const isViewingHistory = viewingCommitId !== null && viewingCommitId !== myHeadCommitId;
 
+  // Build set of commits that have children (used for delete eligibility)
+  const commitsWithChildren = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of commits) {
+      if (c.parent?.id) s.add(c.parent.id);
+    }
+    return s;
+  }, [commits]);
+
+  // Can the user delete the currently viewed commit?
+  const canDeleteActiveCommit = useMemo(() => {
+    if (!activeCommit || !user) return false;
+    // Must be a leaf
+    if (commitsWithChildren.has(activeCommit.id)) return false;
+    // Must be authored by user or be a Tract commit (no author)
+    const authorId = activeCommit.author?.id;
+    if (authorId && authorId !== user.id) return false;
+    // No other participant may have adopted this commit
+    const othersAdopted = participants.some(
+      (p) => p.headCommitId === activeCommit.id && p.user?.id !== user.id,
+    );
+    if (othersAdopted) return false;
+    return true;
+  }, [activeCommit, user, commitsWithChildren, participants]);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDeleteCommit() {
+    if (!activeCommitId || !user) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/delete-commit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commitId: activeCommitId, userId: user.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to delete");
+      }
+      setDeleteOpen(false);
+      setViewingCommitId(null);
+    } catch (e) {
+      console.error("Delete commit failed:", e);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   // Contract summary — read from InstantDB, regenerate only after new commits
   const summary = contract?.summary
     ? { text: contract.summary as string, generatedAt: contract.summaryGeneratedAt as number }
@@ -661,14 +711,26 @@ function ContractEditor({ contractId }: { contractId: string }) {
                   {activeCommit?.message && (
                     <p className="text-xs text-muted-foreground italic">{activeCommit.message}</p>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => setCommitDetailOpen(true)}
-                  >
-                    View changes from parent
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => setCommitDetailOpen(true)}
+                    >
+                      View changes from parent
+                    </Button>
+                    {canDeleteActiveCommit && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs text-destructive hover:text-destructive"
+                        onClick={() => setDeleteOpen(true)}
+                      >
+                        Delete this commit
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -780,6 +842,34 @@ function ContractEditor({ contractId }: { contractId: string }) {
         open={commitDetailOpen}
         onOpenChange={setCommitDetailOpen}
       />
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete commit?</DialogTitle>
+            <DialogDescription>
+              This will permanently remove commit{" "}
+              <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>.
+              {activeCommitId === myHeadCommitId
+                ? " Your version will move back to the parent commit."
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteCommit}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SignDialog
         open={signOpen}

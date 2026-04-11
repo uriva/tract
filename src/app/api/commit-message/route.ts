@@ -31,7 +31,6 @@ Commit message:`,
     ],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 50,
     },
   };
 }
