@@ -47,7 +47,6 @@ Rules:
       ],
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 8192,
       },
     }),
   });
@@ -90,7 +89,6 @@ Write a concise commit message describing what changed. No quotes, no period at 
       ],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 150,
       },
     }),
   });
