@@ -112,17 +112,17 @@ export function InviteDialog({
                     key={c.id}
                     type="button"
                     onClick={() => setSelectedCommitId(c.id)}
-                    className={`w-full text-left px-3 py-2 rounded text-sm cursor-pointer transition-colors ${
+                    className={`w-full text-left px-3 py-2 rounded text-sm cursor-pointer transition-colors overflow-hidden ${
                       isSelected
-                        ? "bg-accent text-accent-foreground"
+                        ? "bg-primary text-primary-foreground"
                         : "hover:bg-muted"
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-muted-foreground">{c.id.slice(0, 7)}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`font-mono text-xs shrink-0 ${isSelected ? "text-primary-foreground/70" : "text-muted-foreground"}`}>{c.id.slice(0, 7)}</span>
                       <span className="truncate">{msg}</span>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
+                    <div className={`text-xs mt-0.5 ${isSelected ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                       by {authorLabel}
                       {isMyHead && " — your version"}
                     </div>
