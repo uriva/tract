@@ -71,36 +71,6 @@ describe("commit-message route", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when Gemini returns empty candidates on non-first commit", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      emptyGeminiResponse(),
-    );
-
-    const res = await POST(makeRequest({
-      oldContent: "# Existing content\nSome stuff here",
-      newContent: "# Existing content\nSome stuff here\n\n## New section",
-    }) as any);
-
-    const data = await res.json();
-    expect(res.status).toBe(502);
-    expect(data.error).toBe("Empty response from model");
-  });
-
-  it("returns 502 when Gemini API returns non-200", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response("Internal error", { status: 500 }),
-    );
-
-    const res = await POST(makeRequest({
-      oldContent: "old",
-      newContent: "new",
-    }) as any);
-
-    const data = await res.json();
-    expect(res.status).toBe(502);
-    expect(data.error).toBe("Failed to generate commit description");
-  });
-
   it("handles null/undefined oldContent as first commit", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
@@ -113,5 +83,52 @@ describe("commit-message route", () => {
     expect(res.status).toBe(200);
     expect(data.message).toBe("Initial draft");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("retries on empty candidates and succeeds on second attempt", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(emptyGeminiResponse())
+      .mockResolvedValueOnce(geminiResponse("Updated scope section"));
+
+    const res = await POST(makeRequest({
+      oldContent: "# Existing content",
+      newContent: "# Existing content\n\n## Scope\nNew scope.",
+    }) as any);
+
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.message).toBe("Updated scope section");
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries 3 times then returns 502", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(emptyGeminiResponse())
+      .mockResolvedValueOnce(emptyGeminiResponse())
+      .mockResolvedValueOnce(emptyGeminiResponse());
+
+    const res = await POST(makeRequest({
+      oldContent: "old content",
+      newContent: "new content",
+    }) as any);
+
+    const data = await res.json();
+    expect(res.status).toBe(502);
+    expect(data.error).toBe("Failed to generate commit description");
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns 502 when Gemini API returns non-200 on all retries", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response("Internal error", { status: 500 })),
+    );
+
+    const res = await POST(makeRequest({
+      oldContent: "old",
+      newContent: "new",
+    }) as any);
+
+    const data = await res.json();
+    expect(res.status).toBe(502);
   });
 });
