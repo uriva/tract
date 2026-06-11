@@ -36,13 +36,63 @@ export function DiffViewer({
     [diffs]
   );
 
+  const hunkInfo = useMemo(() => {
+    const hunkStart = new Map<number, number>();
+    const hunkEnd = new Map<number, number>();
+    const isFirstInHunk = new Set<number>();
+
+    let currentStart = -1;
+    for (let i = 0; i < diffs.length; i++) {
+      if (diffs[i].type !== "unchanged") {
+        if (currentStart === -1) {
+          currentStart = i;
+          isFirstInHunk.add(i);
+        }
+        hunkStart.set(i, currentStart);
+      } else {
+        if (currentStart !== -1) {
+          for (let k = currentStart; k < i; k++) {
+            hunkEnd.set(k, i - 1);
+          }
+          currentStart = -1;
+        }
+      }
+    }
+    if (currentStart !== -1) {
+      for (let k = currentStart; k < diffs.length; k++) {
+        hunkEnd.set(k, diffs.length - 1);
+      }
+    }
+
+    return { hunkStart, hunkEnd, isFirstInHunk };
+  }, [diffs]);
+
   const [approved, setApproved] = useState<Set<number>>(new Set());
 
-  function toggleLine(index: number) {
+  function toggleHunk(index: number) {
+    const start = hunkInfo.hunkStart.get(index);
+    const end = hunkInfo.hunkEnd.get(index);
+    if (start === undefined || end === undefined) return;
+
     setApproved((prev) => {
       const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
+      let allApproved = true;
+      for (let k = start; k <= end; k++) {
+        if (!next.has(k)) {
+          allApproved = false;
+          break;
+        }
+      }
+
+      if (allApproved) {
+        for (let k = start; k <= end; k++) {
+          next.delete(k);
+        }
+      } else {
+        for (let k = start; k <= end; k++) {
+          next.add(k);
+        }
+      }
       return next;
     });
   }
@@ -115,8 +165,9 @@ export function DiffViewer({
               diff={diff}
               index={i}
               isApproved={approved.has(i)}
-              onToggle={toggleLine}
+              onToggle={toggleHunk}
               wordSegments={wordSegments.get(i)}
+              isFirstInHunk={hunkInfo.isFirstInHunk.has(i)}
             />
           ))}
         </div>
@@ -125,19 +176,23 @@ export function DiffViewer({
   );
 }
 
+interface DiffLineProps {
+  diff: LineDiff;
+  index: number;
+  isApproved: boolean;
+  onToggle: (index: number) => void;
+  wordSegments?: WordSegment[];
+  isFirstInHunk: boolean;
+}
+
 function DiffLine({
   diff,
   index,
   isApproved,
   onToggle,
   wordSegments,
-}: {
-  diff: LineDiff;
-  index: number;
-  isApproved: boolean;
-  onToggle: (index: number) => void;
-  wordSegments?: WordSegment[];
-}) {
+  isFirstInHunk,
+}: DiffLineProps) {
   if (diff.type === "unchanged") {
     return (
       <div className="flex items-stretch text-xs leading-6">
@@ -153,6 +208,7 @@ function DiffLine({
   }
 
   const isAdded = diff.type === "added";
+  const isPaired = !!wordSegments;
 
   return (
     <div
@@ -161,11 +217,13 @@ function DiffLine({
       }`}
     >
       <div className="w-8 shrink-0 flex items-center justify-center">
-        <Checkbox
-          checked={isApproved}
-          onCheckedChange={() => onToggle(index)}
-          className="h-3.5 w-3.5"
-        />
+        {isFirstInHunk && (
+          <Checkbox
+            checked={isApproved}
+            onCheckedChange={() => onToggle(index)}
+            className="h-3.5 w-3.5"
+          />
+        )}
       </div>
       <div className="w-12 shrink-0 text-right pr-3 text-muted-foreground/50 select-none">
         {diff.lineNumber}
@@ -177,7 +235,9 @@ function DiffLine({
       </div>
       <div
         className={`flex-1 px-3 whitespace-pre-wrap break-all ${
-          isAdded ? "diff-text-added" : "diff-text-removed"
+          isAdded
+            ? isPaired ? "diff-text-added-paired" : "diff-text-added"
+            : isPaired ? "diff-text-removed-paired" : "diff-text-removed"
         }`}
         dir="auto"
       >

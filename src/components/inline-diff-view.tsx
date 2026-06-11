@@ -83,7 +83,9 @@ export function InlineDiffView({
             </div>
             <div
               className={`flex-1 px-3 whitespace-pre-wrap break-all ${
-                isAdded ? "diff-text-added" : "diff-text-removed"
+                isAdded
+                  ? segments ? "diff-text-added-paired" : "diff-text-added"
+                  : segments ? "diff-text-removed-paired" : "diff-text-removed"
               }`}
             >
               {segments ? (

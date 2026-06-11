@@ -186,6 +186,13 @@
   color: var(--diff-removed-fg);
   text-decoration: line-through;
 }
+.diff-text-added-paired {
+  color: var(--diff-added-fg);
+}
+.diff-text-removed-paired {
+  color: var(--diff-removed-fg);
+  text-decoration: line-through;
+}
 .diff-word-added {
   background: var(--diff-added);
   border-radius: 2px;
@@ -194,12 +201,14 @@
   background: var(--diff-removed);
   border-radius: 2px;
 }
-.diff-text-added .diff-word-changed {
+.diff-text-added .diff-word-changed,
+.diff-text-added-paired .diff-word-changed {
   background: var(--diff-word-added);
   border-radius: 2px;
   padding: 1px 0;
 }
-.diff-text-removed .diff-word-changed {
+.diff-text-removed .diff-word-changed,
+.diff-text-removed-paired .diff-word-changed {
   background: var(--diff-word-removed);
   border-radius: 2px;
   padding: 1px 0;
