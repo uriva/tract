@@ -215,7 +215,6 @@
   background: var(--diff-word-removed);
   border-radius: 2px;
   padding: 1px 0;
-  text-decoration: line-through;
 }
 
 /* Markdown rendered view */
