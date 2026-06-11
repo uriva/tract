@@ -15,60 +15,35 @@ describe("normalizeMarkdown", () => {
   });
 });
 
-describe("diff and applySelectedChanges with trailing newlines", () => {
-  it("computes diff and applies changes correctly when target adds trailing newline", () => {
+describe("diff and applySelectedChanges with normalized whitespace", () => {
+  it("ignores trailing newlines and whitespace differences", () => {
     const baseText = "hello\nworld";
     const targetText = "hello\nworld\n";
 
-    const { diffs, hasChanges } = computeLineDiffs(baseText, targetText);
-    expect(hasChanges).toBe(true);
-
-    // Verify diff indices:
-    // 0: unchanged "hello"
-    // 1: removed "world"
-    // 2: added "world"
-    expect(diffs).toEqual([
-      { type: "unchanged", value: "hello", lineNumber: 1, originalLineNumber: 1 },
-      { type: "removed", value: "world", lineNumber: 2, originalLineNumber: 2 },
-      { type: "added", value: "world", lineNumber: 2 },
-    ]);
-
-    // If we approve index 1 and 2, the change is applied and the trailing newline is added
-    const approved = new Set([1, 2]);
-    const result = applySelectedChanges(baseText, targetText, approved);
-    expect(result).toBe(targetText);
-
-    // If we do not approve, the original base text is preserved
-    const noneApproved = new Set<number>();
-    const resultNone = applySelectedChanges(baseText, targetText, noneApproved);
-    expect(resultNone).toBe(baseText);
+    const { hasChanges } = computeLineDiffs(baseText, targetText);
+    expect(hasChanges).toBe(false);
   });
 
-  it("computes diff and applies changes correctly when target removes trailing newline", () => {
-    const baseText = "hello\nworld\n";
-    const targetText = "hello\nworld";
+  it("computes diff and applies changes correctly when actual content changes are present", () => {
+    const baseText = "hello\nworld ";
+    const targetText = "hello\nworld\npeople";
 
     const { diffs, hasChanges } = computeLineDiffs(baseText, targetText);
     expect(hasChanges).toBe(true);
 
     // Verify diff indices:
     // 0: unchanged "hello"
-    // 1: removed "world"
-    // 2: added "world"
+    // 1: unchanged "world" (since trailing spaces are normalized)
+    // 2: added "people"
     expect(diffs).toEqual([
       { type: "unchanged", value: "hello", lineNumber: 1, originalLineNumber: 1 },
-      { type: "removed", value: "world", lineNumber: 2, originalLineNumber: 2 },
-      { type: "added", value: "world", lineNumber: 2 },
+      { type: "unchanged", value: "world", lineNumber: 2, originalLineNumber: 2 },
+      { type: "added", value: "people", lineNumber: 3 },
     ]);
 
-    // If we approve index 1 and 2, the trailing newline is removed
-    const approved = new Set([1, 2]);
+    // If we approve the addition
+    const approved = new Set([2]);
     const result = applySelectedChanges(baseText, targetText, approved);
-    expect(result).toBe(targetText);
-
-    // If we do not approve, the trailing newline is preserved
-    const noneApproved = new Set<number>();
-    const resultNone = applySelectedChanges(baseText, targetText, noneApproved);
-    expect(resultNone).toBe(baseText);
+    expect(result).toBe("hello\nworld\npeople\n");
   });
 });

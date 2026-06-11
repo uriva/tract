@@ -1,4 +1,5 @@
 import { diffLines, diffWordsWithSpace, Change } from "diff";
+import { normalizeMarkdown } from "./utils";
 
 export interface LineDiff {
   type: "added" | "removed" | "unchanged";
@@ -31,7 +32,7 @@ export function computeLineDiffs(
   oldText: string,
   newText: string
 ): { diffs: LineDiff[]; hasChanges: boolean } {
-  const changes: Change[] = diffLines(oldText, newText);
+  const changes: Change[] = diffLines(normalizeMarkdown(oldText), normalizeMarkdown(newText));
   const diffs: LineDiff[] = [];
   let oldLine = 1;
   let newLine = 1;
@@ -224,7 +225,7 @@ export function applySelectedChanges(
   targetText: string,
   approvedIndices: Set<number>
 ): string {
-  const changes: Change[] = diffLines(baseText, targetText);
+  const changes: Change[] = diffLines(normalizeMarkdown(baseText), normalizeMarkdown(targetText));
   const resultLines: LineWithEnding[] = [];
   let diffIndex = 0;
 
