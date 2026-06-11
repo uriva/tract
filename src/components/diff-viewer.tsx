@@ -230,7 +230,7 @@ function DiffLine({
       </div>
       <div className="w-5 shrink-0 text-center select-none font-semibold">
         <span className={isAdded ? "text-diff-added-fg" : "text-diff-removed-fg"}>
-          {isAdded ? "+" : "-"}
+          {diff.value.trim() === "" ? "" : (isAdded ? "+" : "-")}
         </span>
       </div>
       <div

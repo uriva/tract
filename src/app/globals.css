@@ -96,12 +96,12 @@
   --sidebar-ring: oklch(0.55 0.09 260);
 
   /* Diff colors - light */
-  --diff-added: oklch(0.94 0.05 145);
+  --diff-added: oklch(0.975 0.02 145);
   --diff-added-fg: oklch(0.30 0.10 145);
-  --diff-removed: oklch(0.94 0.04 25);
+  --diff-removed: oklch(0.975 0.015 25);
   --diff-removed-fg: oklch(0.35 0.12 25);
-  --diff-added-line: oklch(0.96 0.03 145);
-  --diff-removed-line: oklch(0.96 0.02 25);
+  --diff-added-line: oklch(0.985 0.012 145);
+  --diff-removed-line: oklch(0.985 0.008 25);
   --diff-word-added: oklch(0.85 0.10 145);
   --diff-word-removed: oklch(0.85 0.08 25);
 }
@@ -140,12 +140,12 @@
   --sidebar-ring: oklch(0.65 0.09 260);
 
   /* Diff colors - dark */
-  --diff-added: oklch(0.25 0.06 145);
+  --diff-added: oklch(0.17 0.025 145);
   --diff-added-fg: oklch(0.80 0.08 145);
-  --diff-removed: oklch(0.25 0.05 25);
+  --diff-removed: oklch(0.17 0.02 25);
   --diff-removed-fg: oklch(0.80 0.08 25);
-  --diff-added-line: oklch(0.20 0.04 145);
-  --diff-removed-line: oklch(0.20 0.03 25);
+  --diff-added-line: oklch(0.15 0.015 145);
+  --diff-removed-line: oklch(0.15 0.01 25);
   --diff-word-added: oklch(0.32 0.10 145);
   --diff-word-removed: oklch(0.32 0.08 25);
 }

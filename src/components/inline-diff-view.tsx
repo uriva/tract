@@ -78,7 +78,7 @@ export function InlineDiffView({
                   isAdded ? "text-diff-added-fg" : "text-diff-removed-fg"
                 }
               >
-                {isAdded ? "+" : "−"}
+                {diff.value.trim() === "" ? "" : (isAdded ? "+" : "−")}
               </span>
             </div>
             <div
