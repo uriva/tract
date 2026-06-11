@@ -11,11 +11,18 @@ export function normalizeMarkdown(text: string): string {
 
   const lines = text.split("\n");
   const normalizedLines = lines.map((line) => {
-    // If line ends with exactly 2 spaces, keep exactly 2 spaces (Markdown hard break)
-    if (line.endsWith("  ") && !line.endsWith("   ") && line.trim() !== "") {
-      return line.trimEnd() + "  ";
+    const trimmedLine = line.trimEnd();
+    const isHardBreak = line.endsWith("  ") && !line.endsWith("   ") && line.trim() !== "";
+
+    const match = trimmedLine.match(/^(\s*)(.*)$/);
+    if (match) {
+      const indent = match[1];
+      const content = match[2];
+      const normalizedContent = content.replace(/ {2,}/g, " ");
+      const baseLine = indent + normalizedContent;
+      return isHardBreak ? baseLine + "  " : baseLine;
     }
-    return line.trimEnd();
+    return trimmedLine;
   });
 
   // Remove consecutive empty lines (allow max 1 consecutive empty line, i.e., max one empty line between blocks)

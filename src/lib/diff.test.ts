@@ -9,6 +9,12 @@ describe("normalizeMarkdown", () => {
     expect(normalizeMarkdown(input)).toBe(expected);
   });
 
+  it("normalizes internal consecutive spaces while preserving indentation", () => {
+    const input = "  - List   item  with   multiple   spaces";
+    const expected = "  - List item with multiple spaces\n";
+    expect(normalizeMarkdown(input)).toBe(expected);
+  });
+
   it("handles empty document correctly", () => {
     expect(normalizeMarkdown("")).toBe("");
     expect(normalizeMarkdown("\n\n\n")).toBe("");
