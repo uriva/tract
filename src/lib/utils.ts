@@ -9,7 +9,11 @@ export function cn(...inputs: ClassValue[]) {
 export function normalizeMarkdown(text: string): string {
   if (!text) return "";
 
-  const lines = text.split("\n");
+  // Replace invisible zero-width spaces and convert non-breaking spaces to standard spaces
+  let cleaned = text.replace(/\u200B/g, "");
+  cleaned = cleaned.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ");
+
+  const lines = cleaned.split("\n");
   const normalizedLines = lines.map((line) => {
     const trimmedLine = line.trimEnd();
     const isHardBreak = line.endsWith("  ") && !line.endsWith("   ") && line.trim() !== "";

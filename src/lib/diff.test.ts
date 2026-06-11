@@ -15,6 +15,12 @@ describe("normalizeMarkdown", () => {
     expect(normalizeMarkdown(input)).toBe(expected);
   });
 
+  it("normalizes non-breaking spaces and zero-width spaces", () => {
+    const input = "3.\u00A0Equity\u200B Ownership";
+    const expected = "3. Equity Ownership\n";
+    expect(normalizeMarkdown(input)).toBe(expected);
+  });
+
   it("handles empty document correctly", () => {
     expect(normalizeMarkdown("")).toBe("");
     expect(normalizeMarkdown("\n\n\n")).toBe("");
