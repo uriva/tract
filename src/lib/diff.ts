@@ -171,7 +171,7 @@ export function pairWordDiffs(diffs: LineDiff[]): Map<number, WordSegment[]> {
           const ai = A_indices[a - 1];
           const sim = getSimilarity(diffs[ri].value, diffs[ai].value);
 
-          if (sim >= 0.3) {
+          if (sim >= 0.15) {
             const scoreWithPair = dp[r - 1][a - 1] + sim;
             if (scoreWithPair > best) {
               best = scoreWithPair;
