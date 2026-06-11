@@ -15,6 +15,12 @@ describe("normalizeMarkdown", () => {
     expect(normalizeMarkdown(input)).toBe(expected);
   });
 
+  it("normalizes tabs to spaces", () => {
+    const input = "\t- List\titem with\t\ttabs";
+    const expected = "    - List item with tabs\n";
+    expect(normalizeMarkdown(input)).toBe(expected);
+  });
+
   it("normalizes non-breaking spaces and zero-width spaces", () => {
     const input = "3.\u00A0Mock\u200B Section";
     const expected = "3. Mock Section\n";
@@ -31,6 +37,14 @@ describe("diff and applySelectedChanges with normalized whitespace", () => {
   it("ignores trailing newlines and whitespace differences", () => {
     const baseText = "hello\nworld";
     const targetText = "hello\nworld\n";
+
+    const { hasChanges } = computeLineDiffs(baseText, targetText);
+    expect(hasChanges).toBe(false);
+  });
+
+  it("ignores carriage returns and preserves hard breaks across different line endings", () => {
+    const baseText = "hello  \r\nworld\r\n";
+    const targetText = "hello  \nworld\n";
 
     const { hasChanges } = computeLineDiffs(baseText, targetText);
     expect(hasChanges).toBe(false);

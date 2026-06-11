@@ -9,8 +9,14 @@ export function cn(...inputs: ClassValue[]) {
 export function normalizeMarkdown(text: string): string {
   if (!text) return "";
 
+  // Convert carriage returns to standard unix line endings
+  let cleaned = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  // Expand tab characters to spaces (4 spaces per tab)
+  cleaned = cleaned.replace(/\t/g, "    ");
+
   // Replace invisible zero-width spaces and convert non-breaking spaces to standard spaces
-  let cleaned = text.replace(/\u200B/g, "");
+  cleaned = cleaned.replace(/\u200B/g, "");
   cleaned = cleaned.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ");
 
   const lines = cleaned.split("\n");
