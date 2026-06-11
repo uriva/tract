@@ -7,6 +7,26 @@ export interface LineDiff {
   originalLineNumber?: number;
 }
 
+interface LineWithEnding {
+  value: string;
+  hasNewline: boolean;
+}
+
+function getLinesWithEnding(value: string): LineWithEnding[] {
+  const parts = value.split("\n");
+  if (parts.length > 1 && parts[parts.length - 1] === "") {
+    return parts.slice(0, -1).map((part) => ({
+      value: part,
+      hasNewline: true,
+    }));
+  } else {
+    return parts.map((part, index) => ({
+      value: part,
+      hasNewline: index < parts.length - 1,
+    }));
+  }
+}
+
 export function computeLineDiffs(
   oldText: string,
   newText: string
@@ -17,20 +37,20 @@ export function computeLineDiffs(
   let newLine = 1;
 
   for (const change of changes) {
-    const lines = change.value.replace(/\n$/, "").split("\n");
+    const lines = getLinesWithEnding(change.value);
 
     for (const line of lines) {
       if (change.added) {
         diffs.push({
           type: "added",
-          value: line,
+          value: line.value,
           lineNumber: newLine,
         });
         newLine++;
       } else if (change.removed) {
         diffs.push({
           type: "removed",
-          value: line,
+          value: line.value,
           lineNumber: oldLine,
           originalLineNumber: oldLine,
         });
@@ -38,7 +58,7 @@ export function computeLineDiffs(
       } else {
         diffs.push({
           type: "unchanged",
-          value: line,
+          value: line.value,
           lineNumber: newLine,
           originalLineNumber: oldLine,
         });
@@ -135,11 +155,11 @@ export function applySelectedChanges(
   approvedIndices: Set<number>
 ): string {
   const changes: Change[] = diffLines(baseText, targetText);
-  const resultLines: string[] = [];
+  const resultLines: LineWithEnding[] = [];
   let diffIndex = 0;
 
   for (const change of changes) {
-    const lines = change.value.replace(/\n$/, "").split("\n");
+    const lines = getLinesWithEnding(change.value);
 
     for (const line of lines) {
       if (change.added) {
@@ -162,5 +182,5 @@ export function applySelectedChanges(
     }
   }
 
-  return resultLines.join("\n");
+  return resultLines.map((line) => line.value + (line.hasNewline ? "\n" : "")).join("");
 }
