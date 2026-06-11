@@ -191,7 +191,6 @@
 }
 .diff-text-removed-paired {
   color: var(--diff-removed-fg);
-  text-decoration: line-through;
 }
 .diff-word-added {
   background: var(--diff-added);
@@ -207,11 +206,16 @@
   border-radius: 2px;
   padding: 1px 0;
 }
-.diff-text-removed .diff-word-changed,
+.diff-text-removed .diff-word-changed {
+  background: var(--diff-word-removed);
+  border-radius: 2px;
+  padding: 1px 0;
+}
 .diff-text-removed-paired .diff-word-changed {
   background: var(--diff-word-removed);
   border-radius: 2px;
   padding: 1px 0;
+  text-decoration: line-through;
 }
 
 /* Markdown rendered view */
