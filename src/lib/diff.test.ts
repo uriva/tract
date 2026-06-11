@@ -16,8 +16,8 @@ describe("normalizeMarkdown", () => {
   });
 
   it("normalizes non-breaking spaces and zero-width spaces", () => {
-    const input = "3.\u00A0Equity\u200B Ownership";
-    const expected = "3. Equity Ownership\n";
+    const input = "3.\u00A0Mock\u200B Section";
+    const expected = "3. Mock Section\n";
     expect(normalizeMarkdown(input)).toBe(expected);
   });
 
