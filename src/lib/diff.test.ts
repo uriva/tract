@@ -1,5 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { computeLineDiffs, applySelectedChanges } from "./diff";
+import { normalizeMarkdown } from "./utils";
+
+describe("normalizeMarkdown", () => {
+  it("normalizes consecutive empty lines and trailing spaces while keeping hard breaks", () => {
+    const input = "\n\n# Header   \n\n\nSome text with trailing space \nAnother line  \n\n\nLast line\n\n";
+    const expected = "# Header\n\nSome text with trailing space\nAnother line  \n\nLast line\n";
+    expect(normalizeMarkdown(input)).toBe(expected);
+  });
+
+  it("handles empty document correctly", () => {
+    expect(normalizeMarkdown("")).toBe("");
+    expect(normalizeMarkdown("\n\n\n")).toBe("");
+  });
+});
 
 describe("diff and applySelectedChanges with trailing newlines", () => {
   it("computes diff and applies changes correctly when target adds trailing newline", () => {

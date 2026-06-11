@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SignDialog } from "@/components/sign-dialog";
-import { displayName, assignParticipantColors } from "@/lib/utils";
+import { displayName, assignParticipantColors, normalizeMarkdown } from "@/lib/utils";
 
 const SUMMARY_TRUNCATE = 180;
 
@@ -280,12 +280,15 @@ function ContractEditor({ contractId }: { contractId: string }) {
       }
     }
 
+    const normalizedContent = normalizeMarkdown(content);
+    setContent(normalizedContent);
+
     const newCommitId = id();
 
     const txs = [
       db.tx.commits[newCommitId]
         .update({
-          content,
+          content: normalizedContent,
           message: msg,
           createdAt: Date.now(),
         })
@@ -299,7 +302,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
     if (myHeadCommitId) {
       txs[0] = db.tx.commits[newCommitId]
         .update({
-          content,
+          content: normalizedContent,
           message: msg,
           createdAt: Date.now(),
         })
@@ -354,11 +357,12 @@ function ContractEditor({ contractId }: { contractId: string }) {
       const truncatedPrompt = prompt.length > 120 ? prompt.slice(0, 120) + "..." : prompt;
       const fullMsg = `${data.message}\n\nWritten as per ${requesterName}'s request: "${truncatedPrompt}"`;
 
+      const normalizedAicontent = normalizeMarkdown(data.content);
       const newCommitId = id();
       await db.transact([
         db.tx.commits[newCommitId]
           .update({
-            content: data.content,
+            content: normalizedAicontent,
             message: fullMsg,
             createdAt: Date.now(),
           })

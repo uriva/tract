@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
 import { DiffViewer } from "@/components/diff-viewer";
-import { displayName } from "@/lib/utils";
+import { displayName, normalizeMarkdown } from "@/lib/utils";
 
 function CompareView({
   contractId,
@@ -53,10 +53,13 @@ function CompareView({
     if (!user || !myParticipant || !myHead || !theirHead) return;
     setApplying(true);
 
+    const normalizedNewcontent = normalizeMarkdown(newContent);
+    const normalizedTheircontent = normalizeMarkdown(theirHead.content);
+
     // Fast-forward: if the merged content matches their version exactly,
     // just move our head pointer to their commit instead of creating a new one.
     // This ensures both participants end up on the same commit ("in agreement").
-    if (newContent === theirHead.content) {
+    if (normalizedNewcontent === normalizedTheircontent) {
       await db.transact([
         db.tx.participants[myParticipant.id].update({
           headCommitId: theirHead.id,
@@ -74,7 +77,7 @@ function CompareView({
     await db.transact([
       db.tx.commits[newCommitId]
         .update({
-          content: newContent,
+          content: normalizedNewcontent,
           message,
           createdAt: Date.now(),
         })

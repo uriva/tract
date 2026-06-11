@@ -5,6 +5,48 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Always apply formatting on Markdown content to normalize trailing whitespace and double blank lines. */
+export function normalizeMarkdown(text: string): string {
+  if (!text) return "";
+
+  const lines = text.split("\n");
+  const normalizedLines = lines.map((line) => {
+    // If line ends with exactly 2 spaces, keep exactly 2 spaces (Markdown hard break)
+    if (line.endsWith("  ") && !line.endsWith("   ") && line.trim() !== "") {
+      return line.trimEnd() + "  ";
+    }
+    return line.trimEnd();
+  });
+
+  // Remove consecutive empty lines (allow max 1 consecutive empty line, i.e., max one empty line between blocks)
+  const resultLines: string[] = [];
+  let isPrevEmpty = false;
+  for (let i = 0; i < normalizedLines.length; i++) {
+    const line = normalizedLines[i];
+    const isEmpty = line === "";
+    if (isEmpty) {
+      if (!isPrevEmpty) {
+        resultLines.push("");
+      }
+      isPrevEmpty = true;
+    } else {
+      resultLines.push(line);
+      isPrevEmpty = false;
+    }
+  }
+
+  // Clean up empty lines at the start and end of the document
+  while (resultLines.length > 0 && resultLines[0] === "") {
+    resultLines.shift();
+  }
+  while (resultLines.length > 0 && resultLines[resultLines.length - 1] === "") {
+    resultLines.pop();
+  }
+
+  // Always end the document with exactly one trailing newline (POSIX style)
+  return resultLines.length > 0 ? resultLines.join("\n") + "\n" : "";
+}
+
 /** Display name for a user — handles guests (no email) and regular users. */
 export function displayName(email: string | null | undefined, userId?: string): string {
   if (email) return email.split("@")[0];
