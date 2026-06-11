@@ -122,93 +122,77 @@ function getSimilarity(removedText: string, addedText: string): number {
 }
 
 /**
- * Pair adjacent removed/added lines for word-level diffing.
+ * Pair removed/added lines for word-level diffing globally.
  * Returns a map from diff index → WordSegment[] for lines that have a pair.
  */
 export function pairWordDiffs(diffs: LineDiff[]): Map<number, WordSegment[]> {
   const segments = new Map<number, WordSegment[]>();
 
-  // Find blocks of consecutive removed lines followed by consecutive added lines
-  let i = 0;
-  while (i < diffs.length) {
+  const R_indices: number[] = [];
+  const A_indices: number[] = [];
+
+  for (let i = 0; i < diffs.length; i++) {
     if (diffs[i].type === "removed") {
-      const removedStart = i;
-      while (i < diffs.length && diffs[i].type === "removed") i++;
-      const addedStart = i;
-      while (i < diffs.length && diffs[i].type === "added") i++;
-      const addedEnd = i;
+      R_indices.push(i);
+    } else if (diffs[i].type === "added") {
+      A_indices.push(i);
+    }
+  }
 
-      const removedCount = addedStart - removedStart;
-      const addedCount = addedEnd - addedStart;
+  const M = R_indices.length;
+  const N = A_indices.length;
+  if (M === 0 || N === 0) return segments;
 
-      // Extract the indices of removed and added lines
-      const R_indices: number[] = [];
-      for (let r = removedStart; r < addedStart; r++) {
-        R_indices.push(r);
+  const dp = Array.from({ length: M + 1 }, () => Array(N + 1).fill(0));
+  const parent = Array.from({ length: M + 1 }, () => Array(N + 1).fill(null));
+
+  for (let r = 1; r <= M; r++) {
+    for (let a = 1; a <= N; a++) {
+      let best = dp[r - 1][a];
+      let choice: { type: "skip_r" | "skip_a" | "pair"; sim?: number } = { type: "skip_r" };
+
+      if (dp[r][a - 1] > best) {
+        best = dp[r][a - 1];
+        choice = { type: "skip_a" };
       }
-      const A_indices: number[] = [];
-      for (let a = addedStart; a < addedEnd; a++) {
-        A_indices.push(a);
-      }
 
-      // Compute DP alignment between R and A to find optimal pairs
-      const M = R_indices.length;
-      const N = A_indices.length;
-      const dp = Array.from({ length: M + 1 }, () => Array(N + 1).fill(0));
-      const parent = Array.from({ length: M + 1 }, () => Array(N + 1).fill(null));
+      const ri = R_indices[r - 1];
+      const ai = A_indices[a - 1];
+      const sim = getSimilarity(diffs[ri].value, diffs[ai].value);
 
-      for (let r = 1; r <= M; r++) {
-        for (let a = 1; a <= N; a++) {
-          let best = dp[r - 1][a];
-          let choice: { type: "skip_r" | "skip_a" | "pair"; sim?: number } = { type: "skip_r" };
-
-          if (dp[r][a - 1] > best) {
-            best = dp[r][a - 1];
-            choice = { type: "skip_a" };
-          }
-
-          const ri = R_indices[r - 1];
-          const ai = A_indices[a - 1];
-          const sim = getSimilarity(diffs[ri].value, diffs[ai].value);
-
-          if (sim >= 0.15) {
-            const scoreWithPair = dp[r - 1][a - 1] + sim;
-            if (scoreWithPair > best) {
-              best = scoreWithPair;
-              choice = { type: "pair" as const, sim };
-            }
-          }
-
-          dp[r][a] = best;
-          parent[r][a] = choice;
+      if (sim >= 0.15) {
+        const scoreWithPair = dp[r - 1][a - 1] + sim;
+        if (scoreWithPair > best) {
+          best = scoreWithPair;
+          choice = { type: "pair" as const, sim };
         }
       }
 
-      // Reconstruct pairs
-      let r_curr = M;
-      let a_curr = N;
-      while (r_curr > 0 && a_curr > 0) {
-        const choice = parent[r_curr][a_curr];
-        if (!choice) break;
-        if (choice.type === "pair") {
-          const ri = R_indices[r_curr - 1];
-          const ai = A_indices[a_curr - 1];
-          const { removedSegments, addedSegments } = computeWordSegments(
-            diffs[ri].value,
-            diffs[ai].value
-          );
-          segments.set(ri, removedSegments);
-          segments.set(ai, addedSegments);
-          r_curr--;
-          a_curr--;
-        } else if (choice.type === "skip_r") {
-          r_curr--;
-        } else {
-          a_curr--;
-        }
-      }
+      dp[r][a] = best;
+      parent[r][a] = choice;
+    }
+  }
+
+  let r_curr = M;
+  let a_curr = N;
+  while (r_curr > 0 && a_curr > 0) {
+    const choice = parent[r_curr][a_curr];
+    if (!choice) break;
+    if (choice.type === "pair") {
+      const ri = R_indices[r_curr - 1];
+      const ai = A_indices[a_curr - 1];
+      const { removedSegments, addedSegments } = computeWordSegments(
+        diffs[ri].value,
+        diffs[ai].value
+      );
+      segments.set(ri, removedSegments);
+      segments.set(ai, addedSegments);
+      r_curr--;
+      a_curr--;
+    } else if (choice.type === "skip_r") {
+      r_curr--;
     } else {
-      i++;
+      a_curr--;
     }
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeLineDiffs, applySelectedChanges } from "./diff";
+import { computeLineDiffs, applySelectedChanges, pairWordDiffs } from "./diff";
 import { normalizeMarkdown } from "./utils";
 
 describe("normalizeMarkdown", () => {
@@ -71,5 +71,16 @@ describe("diff and applySelectedChanges with normalized whitespace", () => {
     const approved = new Set([2]);
     const result = applySelectedChanges(baseText, targetText, approved);
     expect(result).toBe("hello\nworld\npeople\n");
+  });
+
+  it("pairs non-adjacent removed and added lines globally", () => {
+    const { diffs } = computeLineDiffs(
+      "**Project IP.** All code\n\n**Pre-existing IP.** Any tech",
+      "Project IP. All code\n\nPre-existing IP. Any tech"
+    );
+    const paired = pairWordDiffs(diffs);
+    
+    // Both paragraphs should be successfully paired despite being separated by empty lines/unchanged parts
+    expect(paired.size).toBe(4); // 2 removed lines + 2 added lines should have word segment mappings
   });
 });
