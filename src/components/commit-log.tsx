@@ -17,7 +17,7 @@ interface Commit {
 
 interface Participant {
   id: string;
-  email: string;
+  email?: string;
   headCommitId?: string;
   user?: { id: string; email?: string };
 }

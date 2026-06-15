@@ -19,7 +19,7 @@ const _schema = i.schema({
     participants: i.entity({
       role: i.string(), // "owner" | "collaborator"
       headCommitId: i.string().optional(),
-      email: i.string().indexed(),
+      email: i.string().indexed().optional(),
       joinedAt: i.number().indexed(),
       legalName: i.string().optional(),
       signatureData: i.string().optional(), // base64 PNG from canvas

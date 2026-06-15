@@ -18,7 +18,7 @@ import { displayName } from "@/lib/utils";
 interface Participant {
   id: string;
   role: string;
-  email: string;
+  email?: string;
   headCommitId?: string;
   user?: { id: string; email?: string };
 }
