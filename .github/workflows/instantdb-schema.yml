@@ -1,0 +1,29 @@
+name: Push InstantDB Schema & Permissions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'instant.schema.ts'
+      - 'instant.perms.ts'
+      - '.github/workflows/instantdb-schema.yml'
+
+jobs:
+  push-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Push InstantDB configuration
+        run: |
+          npx instant-cli push all -y -a "$INSTANT_APP_ID" -t "$INSTANT_ADMIN_TOKEN"
+        env:
+          INSTANT_APP_ID: ${{ secrets.NEXT_PUBLIC_INSTANT_APP_ID }}
+          INSTANT_ADMIN_TOKEN: ${{ secrets.INSTANT_ADMIN_TOKEN }}
