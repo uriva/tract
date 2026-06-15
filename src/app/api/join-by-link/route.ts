@@ -45,14 +45,16 @@ export async function POST(req: Request) {
       },
     });
 
-    const alreadyParticipant = userQuery?.$users?.[0]?.participations?.some(
+    const existingParticipant = userQuery?.$users?.[0]?.participations?.find(
       (p: any) => p.contract?.id === contractId
     );
+
+    const alreadyParticipant = !!existingParticipant;
 
     const isUnlimited = participant.inviteType === "unlimited";
 
     if (alreadyParticipant) {
-      if (!isUnlimited) {
+      if (!isUnlimited && existingParticipant.id !== participantId) {
         // User is already a participant. Delete the redundant invite participant record
         await adminDb.transact([
           adminDb.tx.participants[participantId].delete(),
