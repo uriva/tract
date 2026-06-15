@@ -1,8 +1,8 @@
 import { init } from "@instantdb/admin";
 import schema from "../../../../instant.schema";
 
-const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID!;
-const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN!;
+const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID?.trim()!;
+const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN?.trim()!;
 
 const adminDb = init({ appId: APP_ID, adminToken: ADMIN_TOKEN, schema });
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   });
 
   const unclaimed = (result?.participants ?? []).filter(
-    (p) => !p.user
+    (p: any) => !p.user
   );
 
   if (unclaimed.length === 0) {
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
   // Link each unclaimed participant to this user
   await adminDb.transact(
-    unclaimed.map((p) =>
+    unclaimed.map((p: any) =>
       adminDb.tx.participants[p.id].link({ user: userId })
     )
   );

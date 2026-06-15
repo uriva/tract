@@ -30,8 +30,8 @@ export default {
       create: "auth.id != null",
       // Participants of the same contract can update (e.g. move version pointer)
       update: "auth.id in data.ref('contract.participants.user.id')",
-      // Only the contract owner can remove participants
-      delete: "auth.id in data.ref('contract.owner.id')",
+      // Only the contract owner can remove participants, or participants can remove themselves
+      delete: "auth.id in data.ref('contract.owner.id') || auth.id == data.ref('user.id')",
     },
   },
 } as const;

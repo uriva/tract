@@ -167,6 +167,25 @@ function ContractEditor({ contractId }: { contractId: string }) {
     : null;
   const commitCountRef = useRef(0);
 
+  // Automatically clean up duplicate participant records for the current user
+  useEffect(() => {
+    if (!user?.id) return;
+    const myParticipants = participants.filter((p: any) => p.user?.id === user.id);
+    if (myParticipants.length > 1) {
+      // Sort to keep the best one (prefer signed, then newest joinedAt)
+      const sorted = [...myParticipants].sort((a: any, b: any) => {
+        if (a.signedAt && !b.signedAt) return -1;
+        if (!a.signedAt && b.signedAt) return 1;
+        return (b.joinedAt || 0) - (a.joinedAt || 0);
+      });
+      const toDelete = sorted.slice(1);
+      const txs = toDelete.map((p: any) => db.tx.participants[p.id].delete());
+      db.transact(txs).catch((err: any) => {
+        console.error("Failed to clean up duplicate participants:", err);
+      });
+    }
+  }, [participants, user?.id]);
+
   // Regenerate summary after new commits
   useEffect(() => {
     if (!contractId || commits.length === 0) return;
@@ -474,10 +493,29 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const displayContent =
     mode === "edit" ? (content ?? "") : (activeCommit?.content ?? "");
 
-  // Who approves the currently displayed version?
-  const approvers = activeCommitId
-    ? participants.filter((p) => p.headCommitId === activeCommitId)
-    : [];
+  // Who approves the currently displayed version? (deduplicated by user ID or email)
+  const approvers = useMemo(() => {
+    if (!activeCommitId) return [];
+    const list = participants.filter((p: any) => p.headCommitId === activeCommitId);
+    const seen = new Set<string>();
+    return list.filter((p: any) => {
+      const key = p.user?.id || p.email || p.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [activeCommitId, participants]);
+
+  // Unique participants (deduplicated by user ID or email)
+  const uniqueParticipants = useMemo(() => {
+    const seen = new Set<string>();
+    return participants.filter((p: any) => {
+      const key = p.user?.id || p.email || p.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [participants]);
 
   return (
     <div className="space-y-6">
@@ -685,7 +723,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     );
                   })}{" "}
                   version
-                  {approvers.length === participants.length && participants.length >= 2 && (
+                  {approvers.length === uniqueParticipants.length && uniqueParticipants.length >= 2 && (
                     <Badge variant="default" className="text-[10px] bg-green-600/90 text-white ml-1">
                       🎉 Consensus
                     </Badge>

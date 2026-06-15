@@ -1,8 +1,8 @@
 import { init } from "@instantdb/admin";
 import schema from "../../../../instant.schema";
 
-const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID!;
-const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN!;
+const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID?.trim()!;
+const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN?.trim()!;
 
 const adminDb = init({ appId: APP_ID, adminToken: ADMIN_TOKEN, schema });
 
@@ -28,15 +28,40 @@ export async function POST(req: Request) {
       return Response.json({ error: "Invite link not found or invalid" }, { status: 404 });
     }
 
-    if (!participant.contract) {
+    const contract = participant.contract;
+    if (!contract) {
       return Response.json({ error: "Contract not found for this invite" }, { status: 404 });
+    }
+
+    const contractId = contract.id;
+
+    // Check if this user is already a participant in the contract
+    const userQuery = await adminDb.query({
+      $users: {
+        participations: {
+          contract: {},
+        },
+        $: { where: { id: userId } },
+      },
+    });
+
+    const alreadyParticipant = userQuery?.$users?.[0]?.participations?.some(
+      (p: any) => p.contract?.id === contractId
+    );
+
+    if (alreadyParticipant) {
+      // User is already a participant. Delete the redundant invite participant record
+      await adminDb.transact([
+        adminDb.tx.participants[participantId].delete(),
+      ]);
+      return Response.json({ contractId });
     }
 
     // Check if participant is already linked to a user
     if (participant.user) {
       if (participant.user.id === userId) {
         // Already joined
-        return Response.json({ contractId: participant.contract.id });
+        return Response.json({ contractId });
       } else {
         // Linked to someone else
         return Response.json(
@@ -58,7 +83,7 @@ export async function POST(req: Request) {
         .link({ user: userId }),
     ]);
 
-    return Response.json({ contractId: participant.contract.id });
+    return Response.json({ contractId });
   } catch (err) {
     console.error("Error in join-by-link API:", err);
     return Response.json({ error: "Internal server error" }, { status: 500 });

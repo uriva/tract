@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { init } from "@instantdb/admin";
 import schema from "../../../../instant.schema";
 
-const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID!;
-const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN!;
+const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID?.trim()!;
+const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN?.trim()!;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${GEMINI_API_KEY}`;
 
