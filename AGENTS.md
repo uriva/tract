@@ -6,3 +6,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Deployment
 The project is deployed on Vercel. Pushing to the `main` branch automatically triggers a production build and deployment.
+
+# Database Schema & Permissions
+InstantDB schemas (`instant.schema.ts`) and permissions (`instant.perms.ts`) are automatically pushed to production via a GitHub Actions CI workflow whenever changes are pushed to the `main` branch.
