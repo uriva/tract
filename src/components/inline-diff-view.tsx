@@ -44,7 +44,7 @@ export function InlineDiffView({
   }
 
   return (
-    <div className="font-mono text-sm" dir="auto">
+    <div className="font-mono text-sm">
       {diffs.map((diff, i) => {
         if (diff.type === "unchanged") {
           return (
@@ -52,7 +52,7 @@ export function InlineDiffView({
               <div className="w-12 shrink-0 text-right pr-3 text-muted-foreground/50 select-none">
                 {diff.lineNumber}
               </div>
-              <div className="flex-1 px-3 whitespace-pre-wrap break-all">
+              <div className="flex-1 px-3 whitespace-pre-wrap break-all" dir="auto">
                 {diff.value || "\u00A0"}
               </div>
             </div>
@@ -87,6 +87,7 @@ export function InlineDiffView({
                   ? segments ? "diff-text-added-paired" : "diff-text-added"
                   : segments ? "diff-text-removed-paired" : "diff-text-removed"
               }`}
+              dir="auto"
             >
               {segments ? (
                 <WordSegments segments={segments} />
