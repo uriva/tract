@@ -24,6 +24,7 @@ const _schema = i.schema({
       legalName: i.string().optional(),
       signatureData: i.string().optional(), // base64 PNG from canvas
       signedAt: i.number().optional(),
+      inviteType: i.string().optional(), // "one-time" | "unlimited"
     }),
   },
   links: {

@@ -33,6 +33,7 @@ export function InviteDialog({
   const [selectedCommitId, setSelectedCommitId] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [linkUsage, setLinkUsage] = useState<"one-time" | "unlimited">("one-time");
 
   const { data } = db.useQuery({
     contracts: {
@@ -59,6 +60,7 @@ export function InviteDialog({
       setInviteLink(null);
       setCopiedLink(false);
       setInviteMethod("email");
+      setLinkUsage("one-time");
     }
   }, [open, myHeadCommitId]);
 
@@ -82,6 +84,8 @@ export function InviteDialog({
 
       if (inviteMethod === "email") {
         updateData.email = email.trim().toLowerCase();
+      } else {
+        updateData.inviteType = linkUsage;
       }
 
       await db.transact([
@@ -154,9 +158,40 @@ export function InviteDialog({
                 />
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Generate a unique invite link. Anyone with the link will be able to join and collaborate.
-              </p>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Generate a unique invite link. Anyone with the link will be able to join and collaborate.
+                </p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Link Usage</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      className={`px-3 py-2 text-xs font-medium rounded-md border cursor-pointer transition-all text-center ${
+                        linkUsage === "one-time"
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border hover:bg-muted text-muted-foreground"
+                      }`}
+                      onClick={() => setLinkUsage("one-time")}
+                    >
+                      <div className="font-semibold">One-time Use</div>
+                      <div className="text-[10px] opacity-80 mt-0.5">Expires after first click</div>
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-2 text-xs font-medium rounded-md border cursor-pointer transition-all text-center ${
+                        linkUsage === "unlimited"
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border hover:bg-muted text-muted-foreground"
+                      }`}
+                      onClick={() => setLinkUsage("unlimited")}
+                    >
+                      <div className="font-semibold">Unlimited Uses</div>
+                      <div className="text-[10px] opacity-80 mt-0.5">Multiple people can join</div>
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
 
             <div className="space-y-2">

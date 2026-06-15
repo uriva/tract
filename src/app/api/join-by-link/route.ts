@@ -1,4 +1,4 @@
-import { init } from "@instantdb/admin";
+import { init, id } from "@instantdb/admin";
 import schema from "../../../../instant.schema";
 
 const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID?.trim()!;
@@ -49,11 +49,37 @@ export async function POST(req: Request) {
       (p: any) => p.contract?.id === contractId
     );
 
+    const isUnlimited = participant.inviteType === "unlimited";
+
     if (alreadyParticipant) {
-      // User is already a participant. Delete the redundant invite participant record
+      if (!isUnlimited) {
+        // User is already a participant. Delete the redundant invite participant record
+        await adminDb.transact([
+          adminDb.tx.participants[participantId].delete(),
+        ]);
+      }
+      return Response.json({ contractId });
+    }
+
+    if (isUnlimited) {
+      // Create a brand new participant record for the user, copying settings from the template
+      const newParticipantId = id();
+      const updateData: any = {
+        role: participant.role || "collaborator",
+        headCommitId: participant.headCommitId,
+        joinedAt: Date.now(),
+      };
+      if (email) {
+        updateData.email = email.toLowerCase();
+      }
+
       await adminDb.transact([
-        adminDb.tx.participants[participantId].delete(),
+        adminDb.tx.participants[newParticipantId]
+          .update(updateData)
+          .link({ contract: contractId })
+          .link({ user: userId }),
       ]);
+
       return Response.json({ contractId });
     }
 

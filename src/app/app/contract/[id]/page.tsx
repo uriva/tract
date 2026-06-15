@@ -464,6 +464,30 @@ function ContractEditor({ contractId }: { contractId: string }) {
     downloadPdf();
   }
 
+  // Unique participants (deduplicated by user ID or email)
+  const uniqueParticipants = useMemo(() => {
+    const seen = new Set<string>();
+    return participants.filter((p: any) => {
+      const key = p.user?.id || p.email || p.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [participants]);
+
+  // Who approves the currently displayed version? (deduplicated by user ID or email)
+  const approvers = useMemo(() => {
+    if (!activeCommitId) return [];
+    const list = participants.filter((p: any) => p.headCommitId === activeCommitId);
+    const seen = new Set<string>();
+    return list.filter((p: any) => {
+      const key = p.user?.id || p.email || p.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [activeCommitId, participants]);
+
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading...</div>;
   }
@@ -492,30 +516,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
   // The content to display: edit buffer if editing, otherwise the active commit's content
   const displayContent =
     mode === "edit" ? (content ?? "") : (activeCommit?.content ?? "");
-
-  // Who approves the currently displayed version? (deduplicated by user ID or email)
-  const approvers = useMemo(() => {
-    if (!activeCommitId) return [];
-    const list = participants.filter((p: any) => p.headCommitId === activeCommitId);
-    const seen = new Set<string>();
-    return list.filter((p: any) => {
-      const key = p.user?.id || p.email || p.id;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [activeCommitId, participants]);
-
-  // Unique participants (deduplicated by user ID or email)
-  const uniqueParticipants = useMemo(() => {
-    const seen = new Set<string>();
-    return participants.filter((p: any) => {
-      const key = p.user?.id || p.email || p.id;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [participants]);
 
   return (
     <div className="space-y-6">
