@@ -45,6 +45,10 @@ function CompareView({
   const myHead = commits.find((c) => c.id === myParticipant?.headCommitId);
   const theirHead = commits.find((c) => c.id === theirParticipant?.headCommitId);
 
+  const myTime = myHead?.createdAt ?? 0;
+  const theirTime = theirHead?.createdAt ?? 0;
+  const isTheirVersionLater = theirTime >= myTime;
+
   async function handleApprove(
     newContent: string,
     approvedCount: number,
@@ -55,6 +59,14 @@ function CompareView({
 
     const normalizedNewcontent = normalizeMarkdown(newContent);
     const normalizedTheircontent = normalizeMarkdown(theirHead.content);
+    const normalizedMycontent = normalizeMarkdown(myHead.content);
+
+    // If the merged content matches our current version exactly, there is nothing to commit.
+    if (normalizedNewcontent === normalizedMycontent) {
+      setApplying(false);
+      router.push(`/app/contract/${contractId}`);
+      return;
+    }
 
     // Fast-forward: if the merged content matches their version exactly,
     // just move our head pointer to their commit instead of creating a new one.
@@ -79,6 +91,7 @@ function CompareView({
         .update({
           content: normalizedNewcontent,
           message,
+          // eslint-disable-next-line react-hooks/purity
           createdAt: Date.now(),
         })
         .link({ contract: contractId })
@@ -149,31 +162,58 @@ function CompareView({
           </Button>
           <h1 className="text-xl font-semibold tracking-tight">Compare changes</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Your version vs. <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version
+            {isTheirVersionLater ? (
+              <>
+                Your version vs. <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version
+              </>
+            ) : (
+              <>
+                <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version vs. Your version
+              </>
+            )}
           </p>
         </div>
       </div>
 
       {/* Version info */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="p-3 rounded-lg border border-border bg-card">
-          <div className="text-xs text-muted-foreground">Your version</div>
-          <div className="text-xs font-mono mt-1">{myHead.id.slice(0, 7)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
-        </div>
-        <div className="p-3 rounded-lg border border-border bg-card">
-          <div className="text-xs text-muted-foreground">
-            <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version
-          </div>
-          <div className="text-xs font-mono mt-1">{theirHead.id.slice(0, 7)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
-        </div>
+        {isTheirVersionLater ? (
+          <>
+            <div className="p-3 rounded-lg border border-border bg-card">
+              <div className="text-xs text-muted-foreground">Your version (earlier)</div>
+              <div className="text-xs font-mono mt-1">{myHead.id.slice(0, 7)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
+            </div>
+            <div className="p-3 rounded-lg border border-border bg-card">
+              <div className="text-xs text-muted-foreground">
+                <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version (later)
+              </div>
+              <div className="text-xs font-mono mt-1">{theirHead.id.slice(0, 7)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="p-3 rounded-lg border border-border bg-card">
+              <div className="text-xs text-muted-foreground">
+                <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version (earlier)
+              </div>
+              <div className="text-xs font-mono mt-1">{theirHead.id.slice(0, 7)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
+            </div>
+            <div className="p-3 rounded-lg border border-border bg-card">
+              <div className="text-xs text-muted-foreground">Your version (later)</div>
+              <div className="text-xs font-mono mt-1">{myHead.id.slice(0, 7)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Diff viewer */}
       <DiffViewer
-        myContent={myHead.content}
-        theirContent={theirHead.content}
+        myContent={isTheirVersionLater ? myHead.content : theirHead.content}
+        theirContent={isTheirVersionLater ? theirHead.content : myHead.content}
         theirEmail={displayName(theirParticipant.email, theirParticipant.user?.id)}
         onApprove={handleApprove}
         applying={applying}
