@@ -181,14 +181,26 @@ function CompareView({
           <>
             <div className="p-3 rounded-lg border border-border bg-card">
               <div className="text-xs text-muted-foreground">Your version (earlier)</div>
-              <div className="text-xs font-mono mt-1">{myHead.id.slice(0, 7)}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs font-mono">{myHead.id.slice(0, 7)}</span>
+                <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(myHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                </span>
+              </div>
               <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
             </div>
             <div className="p-3 rounded-lg border border-border bg-card">
               <div className="text-xs text-muted-foreground">
                 <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version (later)
               </div>
-              <div className="text-xs font-mono mt-1">{theirHead.id.slice(0, 7)}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs font-mono">{theirHead.id.slice(0, 7)}</span>
+                <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(theirHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                </span>
+              </div>
               <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
             </div>
           </>
@@ -198,12 +210,24 @@ function CompareView({
               <div className="text-xs text-muted-foreground">
                 <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version (earlier)
               </div>
-              <div className="text-xs font-mono mt-1">{theirHead.id.slice(0, 7)}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs font-mono">{theirHead.id.slice(0, 7)}</span>
+                <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(theirHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                </span>
+              </div>
               <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
             </div>
             <div className="p-3 rounded-lg border border-border bg-card">
               <div className="text-xs text-muted-foreground">Your version (later)</div>
-              <div className="text-xs font-mono mt-1">{myHead.id.slice(0, 7)}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs font-mono">{myHead.id.slice(0, 7)}</span>
+                <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(myHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                </span>
+              </div>
               <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
             </div>
           </>
