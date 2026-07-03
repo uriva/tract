@@ -366,6 +366,9 @@ function CompareView({
         theirEmail={displayName(theirParticipant.email, theirParticipant.user?.id)}
         onApprove={handleApprove}
         applying={applying}
+        contractId={contractId}
+        commitId={theirHead.id}
+        issues={contract?.issues ?? []}
       />
 
       {/* Version Discussions / Issues on these versions */}

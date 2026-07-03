@@ -4,6 +4,11 @@ import { useState, useMemo } from "react";
 import { computeLineDiffs, applySelectedChanges, pairWordDiffs, LineDiff, type WordSegment } from "@/lib/diff";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import db from "@/lib/instant";
+import { id } from "@instantdb/react";
+import { displayName } from "@/lib/utils";
 
 interface DiffViewerProps {
   myContent: string;
@@ -11,6 +16,9 @@ interface DiffViewerProps {
   theirEmail: string;
   onApprove: (newContent: string, approvedCount: number, totalCount: number) => void;
   applying?: boolean;
+  contractId?: string;
+  commitId?: string;
+  issues?: any[];
 }
 
 export function DiffViewer({
@@ -19,7 +27,101 @@ export function DiffViewer({
   theirEmail,
   onApprove,
   applying,
+  contractId,
+  commitId,
+  issues = [],
 }: DiffViewerProps) {
+  const { user } = db.useAuth();
+  const [commentReplyContents, setCommentReplyContents] = useState<{ [issueId: string]: string }>({});
+  const [activeCommentLine, setActiveCommentLine] = useState<{ lineNumber: number; lineType: string } | null>(null);
+  const [newCommentInput, setNewCommentInput] = useState("");
+
+  const lineIssuesMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const issue of issues) {
+      if (issue.lineNumber !== undefined && issue.lineType !== undefined) {
+        const key = `${issue.lineNumber}-${issue.lineType}`;
+        const arr = map.get(key) ?? [];
+        arr.push(issue);
+        map.set(key, arr);
+      }
+    }
+    return map;
+  }, [issues]);
+
+  async function handleCreateInlineComment(lineNumber: number, lineType: string, content: string) {
+    if (!user || !contractId || !content.trim()) return;
+
+    const issueId = id();
+    const commentId = id();
+
+    const txs = [
+      db.tx.issues[issueId]
+        .update({
+          title: `Line ${lineNumber} (${lineType}) Discussion`,
+          createdAt: Date.now(),
+          status: "open",
+          lineNumber,
+          lineType,
+        })
+        .link({ contract: contractId })
+        .link({ creator: user.id }),
+      db.tx.comments[commentId]
+        .update({
+          content: content.trim(),
+          createdAt: Date.now(),
+        })
+        .link({ issue: issueId })
+        .link({ creator: user.id }),
+    ];
+
+    if (commitId) {
+      txs[0] = db.tx.issues[issueId]
+        .update({
+          title: `Line ${lineNumber} (${lineType}) Discussion`,
+          createdAt: Date.now(),
+          status: "open",
+          lineNumber,
+          lineType,
+        })
+        .link({ contract: contractId })
+        .link({ creator: user.id })
+        .link({ commit: commitId });
+    }
+
+    await db.transact(txs);
+    setNewCommentInput("");
+    setActiveCommentLine(null);
+  }
+
+  async function handleReplyInlineComment(issueId: string, content: string) {
+    if (!user || !content.trim()) return;
+
+    const commentId = id();
+    await db.transact([
+      db.tx.comments[commentId]
+        .update({
+          content: content.trim(),
+          createdAt: Date.now(),
+        })
+        .link({ issue: issueId })
+        .link({ creator: user.id }),
+    ]);
+
+    setCommentReplyContents({ ...commentReplyContents, [issueId]: "" });
+  }
+
+  function getTimeAgo(timestamp: number): string {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
   const { diffs, hasChanges } = useMemo(
     () => computeLineDiffs(myContent, theirContent),
     [myContent, theirContent]
@@ -180,6 +282,17 @@ export function DiffViewer({
               onToggle={toggleHunk}
               wordSegments={wordSegments.get(i)}
               isFirstInHunk={hunkInfo.isFirstInHunk.has(i)}
+              lineIssues={lineIssuesMap.get(`${diff.lineNumber}-${diff.type}`) ?? []}
+              user={user}
+              activeCommentLine={activeCommentLine}
+              setActiveCommentLine={setActiveCommentLine}
+              newCommentInput={newCommentInput}
+              setNewCommentInput={setNewCommentInput}
+              commentReplyContents={commentReplyContents}
+              setCommentReplyContents={setCommentReplyContents}
+              onCreateComment={handleCreateInlineComment}
+              onReplyComment={handleReplyInlineComment}
+              getTimeAgo={getTimeAgo}
             />
           ))}
         </div>
@@ -195,6 +308,17 @@ interface DiffLineProps {
   onToggle: (index: number) => void;
   wordSegments?: WordSegment[];
   isFirstInHunk: boolean;
+  lineIssues: any[];
+  user: any;
+  activeCommentLine: { lineNumber: number; lineType: string } | null;
+  setActiveCommentLine: (val: { lineNumber: number; lineType: string } | null) => void;
+  newCommentInput: string;
+  setNewCommentInput: (val: string) => void;
+  commentReplyContents: { [key: string]: string };
+  setCommentReplyContents: (val: { [key: string]: string }) => void;
+  onCreateComment: (lineNumber: number, lineType: string, content: string) => Promise<void>;
+  onReplyComment: (issueId: string, content: string) => Promise<void>;
+  getTimeAgo: (timestamp: number) => string;
 }
 
 function DiffLine({
@@ -204,69 +328,215 @@ function DiffLine({
   onToggle,
   wordSegments,
   isFirstInHunk,
+  lineIssues,
+  user,
+  activeCommentLine,
+  setActiveCommentLine,
+  newCommentInput,
+  setNewCommentInput,
+  commentReplyContents,
+  setCommentReplyContents,
+  onCreateComment,
+  onReplyComment,
+  getTimeAgo,
 }: DiffLineProps) {
-  if (diff.type === "unchanged") {
-    return (
-      <div className="flex items-stretch text-xs leading-6">
-        <div className="w-8 shrink-0" />
+  const isUnchanged = diff.type === "unchanged";
+  const isAdded = diff.type === "added";
+  const isPaired = !isUnchanged && !!wordSegments;
+
+  const showCommentForm = activeCommentLine?.lineNumber === diff.lineNumber && activeCommentLine?.lineType === diff.type;
+  const showCommentsSection = lineIssues.length > 0 || showCommentForm;
+
+  return (
+    <div className="flex flex-col border-b border-border/40 last:border-0 hover:bg-muted/10 group/row">
+      {/* Code line row */}
+      <div
+        className={`flex items-stretch text-xs leading-6 relative ${
+          isUnchanged ? "" : isAdded ? "diff-line-added" : "diff-line-removed"
+        }`}
+      >
+        {/* Hover comment / checkbox column */}
+        <div className="w-8 shrink-0 flex items-center justify-center relative">
+          {isFirstInHunk && !isUnchanged && (
+            <Checkbox
+              checked={isApproved}
+              onCheckedChange={() => onToggle(index)}
+              className="h-3.5 w-3.5 z-10"
+            />
+          )}
+          {user && (
+            <button
+              onClick={() => {
+                if (showCommentForm) {
+                  setActiveCommentLine(null);
+                } else {
+                  setActiveCommentLine({ lineNumber: diff.lineNumber, lineType: diff.type });
+                  setNewCommentInput("");
+                }
+              }}
+              className={`absolute p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-all z-10 ${
+                showCommentForm
+                  ? "opacity-100 bg-accent text-foreground"
+                  : "opacity-0 group-hover/row:opacity-100"
+              }`}
+              style={{ left: "4px" }}
+              title="Comment on this line"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Line number column */}
         <div className="w-12 shrink-0 text-right pr-3 text-muted-foreground/50 select-none">
           {diff.lineNumber}
         </div>
-        <div className="flex-1 px-3 whitespace-pre-wrap break-all" dir="auto">
-          {diff.value || "\u00A0"}
+
+        {/* Action (+/-) column */}
+        {!isUnchanged && (
+          <div className="w-5 shrink-0 text-center select-none font-semibold">
+            <span className={isAdded ? "text-diff-added-fg" : "text-diff-removed-fg"}>
+              {diff.value.trim() === "" ? "" : (isAdded ? "+" : "-")}
+            </span>
+          </div>
+        )}
+
+        {/* Unchanged Action empty space */}
+        {isUnchanged && <div className="w-5 shrink-0" />}
+
+        {/* Text column */}
+        <div
+          className={`flex-1 px-3 whitespace-pre-wrap break-all ${
+            isUnchanged
+              ? ""
+              : isAdded
+                ? isPaired ? "diff-text-added-paired" : "diff-text-added"
+                : isPaired ? "diff-text-removed-paired" : "diff-text-removed"
+          }`}
+          dir="auto"
+        >
+          {isPaired && wordSegments ? (
+            wordSegments.map((seg, i) =>
+              seg.type === "changed" ? (
+                <span key={i} className="diff-word-changed">
+                  {seg.text}
+                </span>
+              ) : (
+                <span key={i}>{seg.text}</span>
+              ),
+            )
+          ) : (
+            diff.value || "\u00A0"
+          )}
         </div>
       </div>
-    );
-  }
 
-  const isAdded = diff.type === "added";
-  const isPaired = !!wordSegments;
+      {/* Inline Comments Section */}
+      {showCommentsSection && (
+        <div className="bg-muted/30 border-l-4 border-accent/40 pl-8 pr-4 py-2 space-y-3 text-xs">
+          {/* Thread list */}
+          {lineIssues.map((issue) => {
+            const comments = [...(issue.comments ?? [])].sort((a: any, b: any) => a.createdAt - b.createdAt);
+            const isClosed = issue.status === "closed";
+            const replyKey = issue.id;
 
-  return (
-    <div
-      className={`flex items-stretch text-xs leading-6 ${
-        isAdded ? "diff-line-added" : "diff-line-removed"
-      }`}
-    >
-      <div className="w-8 shrink-0 flex items-center justify-center">
-        {isFirstInHunk && (
-          <Checkbox
-            checked={isApproved}
-            onCheckedChange={() => onToggle(index)}
-            className="h-3.5 w-3.5"
-          />
-        )}
-      </div>
-      <div className="w-12 shrink-0 text-right pr-3 text-muted-foreground/50 select-none">
-        {diff.lineNumber}
-      </div>
-      <div className="w-5 shrink-0 text-center select-none font-semibold">
-        <span className={isAdded ? "text-diff-added-fg" : "text-diff-removed-fg"}>
-          {diff.value.trim() === "" ? "" : (isAdded ? "+" : "-")}
-        </span>
-      </div>
-      <div
-        className={`flex-1 px-3 whitespace-pre-wrap break-all ${
-          isAdded
-            ? isPaired ? "diff-text-added-paired" : "diff-text-added"
-            : isPaired ? "diff-text-removed-paired" : "diff-text-removed"
-        }`}
-        dir="auto"
-      >
-        {wordSegments ? (
-          wordSegments.map((seg, i) =>
-            seg.type === "changed" ? (
-              <span key={i} className="diff-word-changed">
-                {seg.text}
+            return (
+              <div key={issue.id} className="p-3 rounded-lg border border-border bg-background space-y-2 max-w-2xl">
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground border-b border-border/40 pb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-medium ${
+                      isClosed ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                    }`}>
+                      {isClosed ? "Closed" : "Active"}
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {issue.creator?.email ? displayName(issue.creator.email) : "Unknown"}
+                    </span>
+                  </div>
+                  <span>{new Date(issue.createdAt).toLocaleDateString()}</span>
+                </div>
+
+                {/* Comment list */}
+                <div className="space-y-2">
+                  {comments.map((comment: any) => {
+                    const authorName = comment.creator?.email ? displayName(comment.creator.email) : "Unknown";
+                    return (
+                      <div key={comment.id} className="space-y-0.5">
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <span className="font-semibold text-foreground/80">{authorName}</span>
+                          <span>&middot;</span>
+                          <span>{getTimeAgo(comment.createdAt)}</span>
+                        </div>
+                        <p className="text-foreground/90 whitespace-pre-wrap pl-1">{comment.content}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Reply Form */}
+                {!isClosed && user && (
+                  <div className="flex items-center gap-2 pt-1.5 border-t border-border/30">
+                    <Input
+                      placeholder="Reply inline..."
+                      value={commentReplyContents[replyKey] ?? ""}
+                      onChange={(e) => setCommentReplyContents({ ...commentReplyContents, [replyKey]: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (commentReplyContents[replyKey] ?? "").trim()) {
+                          onReplyComment(replyKey, commentReplyContents[replyKey]);
+                        }
+                      }}
+                      className="text-[11px] h-7 bg-muted/20"
+                    />
+                    <Button
+                      size="sm"
+                      className="h-7 text-[10px] px-2"
+                      onClick={() => onReplyComment(replyKey, commentReplyContents[replyKey])}
+                      disabled={!(commentReplyContents[replyKey] ?? "").trim()}
+                    >
+                      Reply
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* New inline comment input form */}
+          {showCommentForm && (
+            <div className="p-3 rounded-lg border border-border bg-background space-y-2 max-w-2xl">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block">
+                New inline comment on line {diff.lineNumber}
               </span>
-            ) : (
-              <span key={i}>{seg.text}</span>
-            ),
-          )
-        ) : (
-          diff.value || "\u00A0"
-        )}
-      </div>
+              <Textarea
+                placeholder="Write your inline comment/feedback here..."
+                value={newCommentInput}
+                onChange={(e) => setNewCommentInput(e.target.value)}
+                className="min-h-[60px] text-xs"
+              />
+              <div className="flex justify-end gap-1.5">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-[10px]"
+                  onClick={() => setActiveCommentLine(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-7 text-[10px]"
+                  onClick={() => onCreateComment(diff.lineNumber, diff.type, newCommentInput)}
+                  disabled={!newCommentInput.trim()}
+                >
+                  Post comment
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

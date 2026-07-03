@@ -30,6 +30,8 @@ const _schema = i.schema({
       title: i.string(),
       createdAt: i.number().indexed(),
       status: i.string(), // "open" | "closed"
+      lineNumber: i.number().optional(),
+      lineType: i.string().optional(),
     }),
     comments: i.entity({
       content: i.string(),
