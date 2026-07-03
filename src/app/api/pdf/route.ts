@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import path from "path";
 import PDFDocument from "pdfkit";
 import { marked, type Token } from "marked";
+import { isRtlBlock, toVisual } from "./text";
+
+// Directory holding the embedded fonts (bundled at build time).
+const FONT_DIR = path.join(process.cwd(), "src/app/api/pdf/fonts");
 
 // Markdown tokens → pdfkit calls. No HTML, no CSS.
 export async function POST(req: NextRequest) {
@@ -27,21 +32,54 @@ export async function POST(req: NextRequest) {
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
 
-  const FONT_REGULAR = "Helvetica";
-  const FONT_BOLD = "Helvetica-Bold";
-  const FONT_ITALIC = "Helvetica-Oblique";
-  const FONT_BOLD_ITALIC = "Helvetica-BoldOblique";
-  const FONT_MONO = "Courier";
+  // Embed a Hebrew-capable font (Heebo, same as the web UI). The built-in
+  // Adobe fonts (Helvetica/Courier) have no Hebrew glyphs, which is why Hebrew
+  // previously rendered as gibberish/boxes. Heebo has no italic, so italics
+  // reuse the regular/bold faces.
+  doc.registerFont("Heebo", path.join(FONT_DIR, "Heebo-Regular.ttf"));
+  doc.registerFont("Heebo-Bold", path.join(FONT_DIR, "Heebo-Bold.ttf"));
+
+  const FONT_REGULAR = "Heebo";
+  const FONT_BOLD = "Heebo-Bold";
+  const FONT_ITALIC = "Heebo";
+  const FONT_MONO = "Heebo";
   const COLOR_TEXT = "#1a1a1a";
   const COLOR_MUTED = "#6b7280";
   const COLOR_LINK = "#2563eb";
 
+  // The page content box (A4 width 595 - left/right margins of 60 each = 475).
+  const CONTENT_WIDTH = 475;
+
+  // pdfkit/fontkit shape glyphs but do not run the bidi algorithm, so we must
+  // reorder logical text into visual order ourselves and right-align RTL blocks.
+  type TextOpts = NonNullable<Parameters<typeof doc.text>[1]>;
+
+  function drawText(str: string, opts: TextOpts = {}): void {
+    doc.text(toVisual(str), opts);
+  }
+
+  // Same as drawText but positions the run at an explicit x/y (block start).
+  function drawTextAt(
+    str: string,
+    x: number,
+    y: number | undefined,
+    opts: TextOpts = {},
+  ): void {
+    doc.text(toVisual(str), x, y, opts);
+  }
+
+  // Alignment for a block, based on whether its text reads right-to-left.
+  function blockAlign(text: string): "left" | "right" {
+    return isRtlBlock(text) ? "right" : "left";
+  }
+
   // Title
+  const titleText = title || "Contract";
   doc
     .font(FONT_BOLD)
     .fontSize(20)
-    .fillColor(COLOR_TEXT)
-    .text(title || "Contract", { align: "left" });
+    .fillColor(COLOR_TEXT);
+  drawText(titleText, { align: blockAlign(titleText) });
   doc.moveDown(1);
 
   const tokens = marked.lexer(content);
@@ -55,45 +93,47 @@ export async function POST(req: NextRequest) {
     6: 11,
   };
 
-  // Render inline tokens into pdfkit using .text() continuation
-  function renderInline(tokens: Token[]) {
+  // Render inline tokens into pdfkit using .text() continuation. `align` is the
+  // base direction of the containing block so wrapped lines align correctly.
+  function renderInline(tokens: Token[], align: "left" | "right" = "left") {
     for (let i = 0; i < tokens.length; i++) {
       const t = tokens[i];
       const continued = i < tokens.length - 1;
-      const opts = { continued };
+      const opts: TextOpts = { continued, align };
 
       if (t.type === "text") {
-        doc.font(FONT_REGULAR).text(t.text, opts);
+        doc.font(FONT_REGULAR);
+        drawText(t.text, opts);
       } else if (t.type === "strong") {
         doc.font(FONT_BOLD);
         if (t.tokens) {
-          renderInline(t.tokens);
+          renderInline(t.tokens, align);
         } else {
-          doc.text(t.text, opts);
+          drawText(t.text, opts);
         }
         doc.font(FONT_REGULAR);
       } else if (t.type === "em") {
         doc.font(FONT_ITALIC);
         if (t.tokens) {
-          renderInline(t.tokens);
+          renderInline(t.tokens, align);
         } else {
-          doc.text(t.text, opts);
+          drawText(t.text, opts);
         }
         doc.font(FONT_REGULAR);
       } else if (t.type === "codespan") {
-        doc.font(FONT_MONO).fontSize(10).text(t.text, opts).fontSize(12);
-        doc.font(FONT_REGULAR);
+        doc.font(FONT_MONO).fontSize(10);
+        drawText(t.text, opts);
+        doc.fontSize(12).font(FONT_REGULAR);
       } else if (t.type === "link") {
-        doc
-          .fillColor(COLOR_LINK)
-          .text(t.text, { ...opts, link: t.href, underline: true });
+        doc.fillColor(COLOR_LINK);
+        drawText(t.text, { ...opts, link: t.href, underline: true });
         doc.fillColor(COLOR_TEXT);
       } else if (t.type === "br") {
         doc.text("", { continued: false });
       } else if ("text" in t && typeof t.text === "string") {
-        doc.text(t.text, opts);
+        drawText(t.text, opts);
       } else if ("raw" in t && typeof t.raw === "string") {
-        doc.text(t.raw, opts);
+        drawText(t.raw, opts);
       }
     }
   }
@@ -106,40 +146,74 @@ export async function POST(req: NextRequest) {
         case "heading": {
           doc.moveDown(0.5);
           const sz = headingSizes[token.depth] ?? 12;
-          doc
-            .font(FONT_BOLD)
-            .fontSize(sz)
-            .fillColor(COLOR_TEXT)
-            .text(token.text, leftMargin, undefined, {
-              width: 475 - indent * 20,
-            });
+          doc.font(FONT_BOLD).fontSize(sz).fillColor(COLOR_TEXT);
+          drawTextAt(token.text, leftMargin, undefined, {
+            width: CONTENT_WIDTH - indent * 20,
+            align: blockAlign(token.text),
+          });
           doc.fontSize(12).font(FONT_REGULAR);
           doc.moveDown(0.3);
           break;
         }
         case "paragraph": {
+          const align = blockAlign(token.text);
           doc.font(FONT_REGULAR).fontSize(12).fillColor(COLOR_TEXT);
-          doc.text("", leftMargin, undefined, { width: 475 - indent * 20 });
+          doc.text("", leftMargin, undefined, {
+            width: CONTENT_WIDTH - indent * 20,
+            align,
+          });
           if (token.tokens) {
-            renderInline(token.tokens);
+            renderInline(token.tokens, align);
           } else {
-            doc.text(token.text);
+            drawText(token.text, { align });
           }
           doc.moveDown(0.4);
           break;
         }
         case "list": {
+          const itemWidth = CONTENT_WIDTH - indent * 20;
           for (let i = 0; i < token.items.length; i++) {
             const item = token.items[i];
-            const bullet = token.ordered ? `${i + 1}. ` : "\u2022 ";
-            doc
-              .font(FONT_REGULAR)
-              .fontSize(12)
-              .fillColor(COLOR_TEXT)
-              .text(bullet, leftMargin, undefined, {
-                continued: true,
-                width: 475 - indent * 20,
-              });
+            const rtl = isRtlBlock(item.text);
+            const align: "left" | "right" = rtl ? "right" : "left";
+            // RTL bullets sit on the right of the text; for a right-aligned
+            // block the bullet is emitted before the text but rendered visually
+            // trailing, so we append it to the marker with an RTL-safe order.
+            const marker = token.ordered ? `${i + 1}.` : "\u2022";
+            const bullet = rtl ? ` ${marker}` : `${marker} `;
+            doc.font(FONT_REGULAR).fontSize(12).fillColor(COLOR_TEXT);
+            if (rtl) {
+              // Emit text first, then the bullet, both right-aligned.
+              const first = item.tokens?.[0];
+              if (
+                first &&
+                (first.type === "text" || first.type === "paragraph") &&
+                "tokens" in first &&
+                first.tokens
+              ) {
+                doc.text("", leftMargin, undefined, {
+                  width: itemWidth,
+                  align,
+                });
+                renderInline(first.tokens, align);
+                drawText(bullet, { continued: false, align });
+                if (item.tokens && item.tokens.length > 1) {
+                  renderTokens(item.tokens.slice(1), indent + 1);
+                }
+              } else {
+                drawTextAt(`${item.text}${bullet}`, leftMargin, undefined, {
+                  width: itemWidth,
+                  align,
+                });
+              }
+              doc.moveDown(0.15);
+              continue;
+            }
+            drawTextAt(bullet, leftMargin, undefined, {
+              continued: true,
+              width: itemWidth,
+              align,
+            });
             if (item.tokens) {
               // Render first text inline after bullet
               const first = item.tokens[0];
@@ -148,9 +222,9 @@ export async function POST(req: NextRequest) {
                 (first.type === "text" || first.type === "paragraph")
               ) {
                 if ("tokens" in first && first.tokens) {
-                  renderInline(first.tokens);
+                  renderInline(first.tokens, align);
                 } else if ("text" in first) {
-                  doc.text(first.text);
+                  drawText(first.text, { align });
                 }
                 // Render remaining tokens (nested lists, etc.)
                 if (item.tokens.length > 1) {
@@ -161,7 +235,7 @@ export async function POST(req: NextRequest) {
                 renderTokens(item.tokens, indent + 1);
               }
             } else {
-              doc.text(item.text);
+              drawText(item.text, { align });
             }
             doc.moveDown(0.15);
           }
@@ -170,35 +244,30 @@ export async function POST(req: NextRequest) {
         }
         case "code": {
           doc.moveDown(0.2);
-          doc
-            .font(FONT_MONO)
-            .fontSize(10)
-            .fillColor(COLOR_MUTED)
-            .text(token.text, leftMargin + 10, undefined, {
-              width: 455 - indent * 20,
-            });
+          doc.font(FONT_MONO).fontSize(10).fillColor(COLOR_MUTED);
+          drawTextAt(token.text, leftMargin + 10, undefined, {
+            width: CONTENT_WIDTH - 20 - indent * 20,
+          });
           doc.font(FONT_REGULAR).fontSize(12).fillColor(COLOR_TEXT);
           doc.moveDown(0.4);
           break;
         }
         case "blockquote": {
           doc.moveDown(0.2);
-          // Save x and draw a line on the left
-          const bqX = leftMargin + 4;
+          const bqText =
+            token.tokens
+              ?.map((t) => ("text" in t ? t.text : t.raw))
+              .join("")
+              .trim() ?? token.raw;
+          const bqRtl = isRtlBlock(bqText);
+          // Accent bar goes on the leading edge (left for LTR, right for RTL).
+          const bqX = bqRtl ? 535 - indent * 20 - 4 : leftMargin + 4;
           const bqY = doc.y;
-          doc
-            .font(FONT_ITALIC)
-            .fontSize(12)
-            .fillColor(COLOR_MUTED)
-            .text(
-              token.tokens
-                ?.map((t) => ("text" in t ? t.text : t.raw))
-                .join("")
-                .trim() ?? token.raw,
-              leftMargin + 14,
-              undefined,
-              { width: 461 - indent * 20 }
-            );
+          doc.font(FONT_ITALIC).fontSize(12).fillColor(COLOR_MUTED);
+          drawTextAt(bqText, leftMargin + 14, undefined, {
+            width: CONTENT_WIDTH - 14 - indent * 20,
+            align: bqRtl ? "right" : "left",
+          });
           const bqEnd = doc.y;
           doc
             .strokeColor("#d1d5db")
@@ -225,18 +294,17 @@ export async function POST(req: NextRequest) {
         case "table": {
           doc.moveDown(0.3);
           const colCount = token.header.length;
-          const colWidth = (475 - indent * 20) / colCount;
+          const colWidth = (CONTENT_WIDTH - indent * 20) / colCount;
 
           // Header
           doc.font(FONT_BOLD).fontSize(11);
           for (let c = 0; c < colCount; c++) {
             const cell = token.header[c];
-            doc.text(
-              cell.text,
-              leftMargin + c * colWidth,
-              undefined,
-              { width: colWidth, continued: c < colCount - 1 }
-            );
+            drawTextAt(cell.text, leftMargin + c * colWidth, undefined, {
+              width: colWidth,
+              continued: c < colCount - 1,
+              align: blockAlign(cell.text),
+            });
           }
           doc.moveDown(0.2);
 
@@ -245,12 +313,11 @@ export async function POST(req: NextRequest) {
           for (const row of token.rows) {
             for (let c = 0; c < colCount; c++) {
               const cell = row[c];
-              doc.text(
-                cell.text,
-                leftMargin + c * colWidth,
-                undefined,
-                { width: colWidth, continued: c < colCount - 1 }
-              );
+              drawTextAt(cell.text, leftMargin + c * colWidth, undefined, {
+                width: colWidth,
+                continued: c < colCount - 1,
+                align: blockAlign(cell.text),
+              });
             }
             doc.moveDown(0.1);
           }
@@ -265,13 +332,11 @@ export async function POST(req: NextRequest) {
         default: {
           // Fallback: render raw text
           if ("text" in token && typeof token.text === "string") {
-            doc
-              .font(FONT_REGULAR)
-              .fontSize(12)
-              .fillColor(COLOR_TEXT)
-              .text(token.text, leftMargin, undefined, {
-                width: 475 - indent * 20,
-              });
+            doc.font(FONT_REGULAR).fontSize(12).fillColor(COLOR_TEXT);
+            drawTextAt(token.text, leftMargin, undefined, {
+              width: CONTENT_WIDTH - indent * 20,
+              align: blockAlign(token.text),
+            });
             doc.moveDown(0.3);
           }
           break;
@@ -307,11 +372,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Name line
-    doc
-      .font(FONT_BOLD)
-      .fontSize(12)
-      .fillColor(COLOR_TEXT)
-      .text(signature.legalName, 60, undefined, { width: 475 });
+    doc.font(FONT_BOLD).fontSize(12).fillColor(COLOR_TEXT);
+    drawTextAt(signature.legalName, 60, undefined, {
+      width: CONTENT_WIDTH,
+      align: blockAlign(signature.legalName),
+    });
     doc.moveDown(0.15);
 
     // Date
