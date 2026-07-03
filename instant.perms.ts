@@ -17,8 +17,8 @@ export default {
       view: "auth.id in data.ref('contract.participants.user.id')",
       // Any authenticated user can create commits
       create: "auth.id != null",
-      // Commits are immutable
-      update: "false",
+      // Allow updating a commit if the user is the author (e.g. for squashing/amending)
+      update: "auth.id in data.ref('author.id')",
       delete: "false",
     },
   },
