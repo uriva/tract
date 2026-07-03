@@ -103,7 +103,9 @@ function CompareView({
     ]);
 
     setApplying(false);
-    router.push(`/app/contract/${contractId}`);
+    if (approvedCount >= totalCount) {
+      router.push(`/app/contract/${contractId}`);
+    }
   }
 
   if (isLoading) {
@@ -236,6 +238,7 @@ function CompareView({
 
       {/* Diff viewer */}
       <DiffViewer
+        key={`${myHead.id}-${theirHead.id}`}
         myContent={isTheirVersionLater ? myHead.content : theirHead.content}
         theirContent={isTheirVersionLater ? theirHead.content : myHead.content}
         theirEmail={displayName(theirParticipant.email, theirParticipant.user?.id)}
