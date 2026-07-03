@@ -736,8 +736,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 <CollapsibleSummary text={summary.text} />
               )}
 
-              {/* Adopt bar — shown when viewing a historical commit */}
-              {isViewingHistory && (
+              {/* Action bar — shown when viewing a historical commit or when the current commit is deletable */}
+              {(isViewingHistory || canDeleteActiveCommit) && (
                 <div className="space-y-2 p-3 rounded-lg border border-accent/30 bg-accent/5">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
@@ -746,9 +746,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
                         ? <> by <span title={activeCommit.author.email}>{displayName(activeCommit.author.email)}</span></>
                         : " by Tract"}
                     </p>
-                    <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
-                      Adopt this version
-                    </Button>
+                    {isViewingHistory && (
+                      <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
+                        Adopt this version
+                      </Button>
+                    )}
                   </div>
                   {activeCommit?.message && (
                     <p className="text-xs text-muted-foreground italic">{activeCommit.message}</p>
