@@ -151,8 +151,8 @@ export function ParticipantList({
         }
 
         return (
-          <div key={p.id} className="group flex items-center justify-between gap-2 py-1">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div key={p.id} className="group flex flex-col gap-1 py-1">
+            <div className="flex items-center gap-2 min-w-0">
               <div
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ backgroundColor: colorMap?.get(p.id) ?? "var(--color-muted-foreground)" }}
@@ -167,7 +167,7 @@ export function ParticipantList({
               </Badge>
             </div>
 
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1 shrink-0 pl-4">
               {status === "has-notes" && (
                 <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
                   <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10">

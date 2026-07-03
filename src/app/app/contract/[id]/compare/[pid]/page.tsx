@@ -5,10 +5,31 @@ import { useRouter } from "next/navigation";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
 import { DiffViewer } from "@/components/diff-viewer";
+import { computeLineDiffs } from "@/lib/diff";
 import { displayName, normalizeMarkdown } from "@/lib/utils";
+
+// Count the number of change hunks between two documents (a hunk is a run of
+// consecutive changed lines), matching how the diff viewer counts changes.
+function countHunks(before: string, after: string): number {
+  const { diffs } = computeLineDiffs(before, after);
+  let hunks = 0;
+  let inHunk = false;
+  for (const d of diffs) {
+    if (d.type !== "unchanged") {
+      if (!inHunk) {
+        hunks++;
+        inHunk = true;
+      }
+    } else {
+      inHunk = false;
+    }
+  }
+  return hunks;
+}
 
 function CompareView({
   contractId,
@@ -20,14 +41,107 @@ function CompareView({
   const { user } = db.useAuth();
   const router = useRouter();
   const [applying, setApplying] = useState(false);
+  const [newIssueTitle, setNewIssueTitle] = useState("");
+  const [newCommentContent, setNewCommentContent] = useState("");
+  const [replyContents, setReplyContents] = useState<{ [issueId: string]: string }>({});
+
+  async function handleCreateIssue() {
+    if (!user || !newIssueTitle.trim() || !newCommentContent.trim()) return;
+
+    const issueId = id();
+    const commentId = id();
+
+    const targetCommit = theirHead ?? myHead;
+
+    const txs = [
+      db.tx.issues[issueId]
+        .update({
+          title: newIssueTitle.trim(),
+          createdAt: Date.now(),
+          status: "open",
+        })
+        .link({ contract: contractId })
+        .link({ creator: user.id }),
+      db.tx.comments[commentId]
+        .update({
+          content: newCommentContent.trim(),
+          createdAt: Date.now(),
+        })
+        .link({ issue: issueId })
+        .link({ creator: user.id }),
+    ];
+
+    if (targetCommit) {
+      txs[0] = db.tx.issues[issueId]
+        .update({
+          title: newIssueTitle.trim(),
+          createdAt: Date.now(),
+          status: "open",
+        })
+        .link({ contract: contractId })
+        .link({ creator: user.id })
+        .link({ commit: targetCommit.id });
+    }
+
+    await db.transact(txs);
+    setNewIssueTitle("");
+    setNewCommentContent("");
+  }
+
+  async function handleReply(issueId: string) {
+    if (!user) return;
+    const content = (replyContents[issueId] ?? "").trim();
+    if (!content) return;
+
+    const commentId = id();
+    await db.transact([
+      db.tx.comments[commentId]
+        .update({
+          content,
+          createdAt: Date.now(),
+        })
+        .link({ issue: issueId })
+        .link({ creator: user.id }),
+    ]);
+
+    setReplyContents({ ...replyContents, [issueId]: "" });
+  }
+
+  async function handleToggleIssueStatus(issueId: string, currentStatus: string) {
+    const newStatus = currentStatus === "closed" ? "open" : "closed";
+    await db.transact([
+      db.tx.issues[issueId].update({
+        status: newStatus,
+      }),
+    ]);
+  }
+
+  function getTimeAgo(timestamp: number): string {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
 
   const { data, isLoading } = db.useQuery({
     contracts: {
       commits: {
         author: {},
+        parent: {},
       },
       participants: {
         user: {},
+      },
+      issues: {
+        creator: {},
+        commit: {},
+        comments: {
+          creator: {},
+        },
       },
       $: { where: { id: contractId } },
     },
@@ -82,25 +196,65 @@ function CompareView({
       return;
     }
 
-    // Partial merge: create a new commit with the selectively merged content.
-    const newCommitId = id();
-    const message = `Accept ${approvedCount}/${totalCount} changes from ${displayName(theirParticipant?.email, theirParticipant?.user?.id)}`;
+    // Partial merge.
+    const theirName = displayName(theirParticipant?.email, theirParticipant?.user?.id);
 
-    await db.transact([
-      db.tx.commits[newCommitId]
-        .update({
+    // Squash: if my current head is itself an amendable "accept" commit from this
+    // same participant, update it in place instead of stacking another commit.
+    // This keeps the history clean (one merged commit) rather than a chain of
+    // "Accept 2 changes" → "Accept 4 changes".
+    const myHeadIsMine = myHead.author?.id === user.id;
+    const myHeadHasChildren = commits.some((c) => c.parent?.id === myHead.id);
+    const othersOnMyHead = participants.some(
+      (p) => p.id !== myParticipant.id && p.headCommitId === myHead.id,
+    );
+    const myHeadIsAcceptFromThem = myHead.message?.includes(`changes from ${theirName}`) ?? false;
+    const squashBaseId = myHead.parent?.id;
+    const squashBase = squashBaseId
+      ? commits.find((c) => c.id === squashBaseId)
+      : undefined;
+    const canSquash =
+      myHeadIsMine &&
+      !myHeadHasChildren &&
+      !othersOnMyHead &&
+      myHeadIsAcceptFromThem &&
+      squashBase?.content !== undefined;
+
+    if (canSquash && squashBase) {
+      // Recompute counts against the pre-squash baseline so the cumulative
+      // number of accepted/available changes is accurate.
+      const baseContent = normalizeMarkdown(squashBase.content);
+      const cumulativeApproved = countHunks(baseContent, normalizedNewcontent);
+      const cumulativeTotal = countHunks(baseContent, normalizedTheircontent);
+      const message = `Accept ${cumulativeApproved}/${cumulativeTotal} changes from ${theirName}`;
+
+      await db.transact([
+        db.tx.commits[myHead.id].update({
           content: normalizedNewcontent,
           message,
           // eslint-disable-next-line react-hooks/purity
           createdAt: Date.now(),
-        })
-        .link({ contract: contractId })
-        .link({ author: user.id })
-        .link({ parent: myHead.id }),
-      db.tx.participants[myParticipant.id].update({
-        headCommitId: newCommitId,
-      }),
-    ]);
+        }),
+      ]);
+    } else {
+      const message = `Accept ${approvedCount}/${totalCount} changes from ${theirName}`;
+      const newCommitId = id();
+      await db.transact([
+        db.tx.commits[newCommitId]
+          .update({
+            content: normalizedNewcontent,
+            message,
+            // eslint-disable-next-line react-hooks/purity
+            createdAt: Date.now(),
+          })
+          .link({ contract: contractId })
+          .link({ author: user.id })
+          .link({ parent: myHead.id }),
+        db.tx.participants[myParticipant.id].update({
+          headCommitId: newCommitId,
+        }),
+      ]);
+    }
 
     setApplying(false);
     if (approvedCount >= totalCount) {
@@ -213,6 +367,163 @@ function CompareView({
         onApprove={handleApprove}
         applying={applying}
       />
+
+      {/* Version Discussions / Issues on these versions */}
+      <div className="p-6 rounded-lg border border-border bg-card space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Version Discussions</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Create feedback or discuss changes in this version comparison. Leave general comments or specify issues.
+          </p>
+        </div>
+
+        {/* Create new issue / comment thread */}
+        <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/40">
+          <h3 className="text-sm font-medium">Start a new discussion thread / issue</h3>
+          <div className="space-y-3">
+            <Input
+              placeholder="Topic or issue title (e.g., 'Clarify section 3 payment terms')"
+              value={newIssueTitle}
+              onChange={(e) => setNewIssueTitle(e.target.value)}
+              className="text-sm"
+            />
+            <textarea
+              placeholder="Write your feedback or comment here..."
+              value={newCommentContent}
+              onChange={(e) => setNewCommentContent(e.target.value)}
+              className="w-full min-h-[80px] text-sm p-3 rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setNewIssueTitle("");
+                  setNewCommentContent("");
+                }}
+              >
+                Clear
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCreateIssue}
+                disabled={!newIssueTitle.trim() || !newCommentContent.trim() || !user}
+              >
+                Create discussion
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Existing Discussion Threads */}
+        <div className="space-y-4">
+          {(() => {
+            const contractIssues = contract?.issues ?? [];
+            const relevantIssues = contractIssues.filter(
+              (issue: any) =>
+                !issue.commit ||
+                issue.commit.id === myHead?.id ||
+                issue.commit.id === theirHead?.id
+            );
+            const sortedIssues = [...relevantIssues].sort((a: any, b: any) => b.createdAt - a.createdAt);
+
+            return (
+              <>
+                <h3 className="text-sm font-semibold">Active threads on these versions ({sortedIssues.length})</h3>
+                {sortedIssues.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">No discussion threads found for these versions yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {sortedIssues.map((issue: any) => {
+                      const comments = [...(issue.comments ?? [])].sort((a: any, b: any) => a.createdAt - b.createdAt);
+                      const isClosed = issue.status === "closed";
+                      const issueId = issue.id;
+                      const creatorEmail = issue.creator?.email ? displayName(issue.creator.email) : "Unknown user";
+
+                      return (
+                        <div key={issue.id} className="p-4 rounded-lg border border-border bg-background space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                isClosed ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                              }`}>
+                                {isClosed ? "Closed" : "Active"}
+                              </span>
+                              <h4 className="font-medium text-sm">{issue.title}</h4>
+                              {issue.commit && (
+                                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                  Version: {issue.commit.id.slice(0, 7)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-muted-foreground">
+                                Started by {creatorEmail} &middot; {new Date(issue.createdAt).toLocaleDateString()}
+                              </span>
+                              {user && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-[10px] h-7 px-2 hover:bg-accent"
+                                  onClick={() => handleToggleIssueStatus(issue.id, issue.status)}
+                                >
+                                  {isClosed ? "Reopen" : "Close"}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Comments Stream (linear comment correspondence) */}
+                          <div className="pl-4 border-l border-border/80 space-y-3">
+                            {comments.map((comment: any) => {
+                              const commenterEmail = comment.creator?.email ? displayName(comment.creator.email) : "Unknown user";
+                              return (
+                                <div key={comment.id} className="text-xs space-y-1">
+                                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                                    <span className="font-semibold text-foreground">{commenterEmail}</span>
+                                    <span>&middot;</span>
+                                    <span>{getTimeAgo(comment.createdAt)}</span>
+                                  </div>
+                                  <p className="text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Quick Reply Form */}
+                          {!isClosed && user && (
+                            <div className="flex items-center gap-2 pt-2">
+                              <Input
+                                placeholder="Reply to this thread..."
+                                value={replyContents[issueId] ?? ""}
+                                onChange={(e) => setReplyContents({ ...replyContents, [issueId]: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && (replyContents[issueId] ?? "").trim()) {
+                                    handleReply(issueId);
+                                  }
+                                }}
+                                className="text-xs h-8"
+                              />
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => handleReply(issueId)}
+                                disabled={!(replyContents[issueId] ?? "").trim()}
+                              >
+                                Reply
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      </div>
     </div>
   );
 }

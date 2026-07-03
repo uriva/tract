@@ -34,4 +34,20 @@ export default {
       delete: "auth.id in data.ref('contract.owner.id') || auth.id in data.ref('user.id')",
     },
   },
+  issues: {
+    allow: {
+      view: "auth.id in data.ref('contract.participants.user.id')",
+      create: "auth.id != null",
+      update: "auth.id in data.ref('contract.participants.user.id')",
+      delete: "auth.id in data.ref('contract.participants.user.id')",
+    },
+  },
+  comments: {
+    allow: {
+      view: "auth.id in data.ref('issue.contract.participants.user.id')",
+      create: "auth.id != null",
+      update: "auth.id in data.ref('creator.id')",
+      delete: "auth.id in data.ref('creator.id')",
+    },
+  },
 } as const;

@@ -77,6 +77,93 @@ function ContractEditor({ contractId }: { contractId: string }) {
     | null
   >(null);
 
+  const [activeTab, setActiveTab] = useState<"document" | "issues">("document");
+  const [newIssueTitle, setNewIssueTitle] = useState("");
+  const [newCommentContent, setNewCommentContent] = useState("");
+  const [replyContents, setReplyContents] = useState<{ [issueId: string]: string }>({});
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+
+  async function handleCreateIssue() {
+    if (!user || !newIssueTitle.trim() || !newCommentContent.trim()) return;
+
+    const issueId = id();
+    const commentId = id();
+
+    const txs = [
+      db.tx.issues[issueId]
+        .update({
+          title: newIssueTitle.trim(),
+          createdAt: Date.now(),
+          status: "open",
+        })
+        .link({ contract: contractId })
+        .link({ creator: user.id }),
+      db.tx.comments[commentId]
+        .update({
+          content: newCommentContent.trim(),
+          createdAt: Date.now(),
+        })
+        .link({ issue: issueId })
+        .link({ creator: user.id }),
+    ];
+
+    if (activeCommitId) {
+      txs[0] = db.tx.issues[issueId]
+        .update({
+          title: newIssueTitle.trim(),
+          createdAt: Date.now(),
+          status: "open",
+        })
+        .link({ contract: contractId })
+        .link({ creator: user.id })
+        .link({ commit: activeCommitId });
+    }
+
+    await db.transact(txs);
+    setNewIssueTitle("");
+    setNewCommentContent("");
+    setSelectedIssueId(issueId);
+  }
+
+  async function handleReply(issueId: string) {
+    if (!user) return;
+    const content = (replyContents[issueId] ?? "").trim();
+    if (!content) return;
+
+    const commentId = id();
+    await db.transact([
+      db.tx.comments[commentId]
+        .update({
+          content,
+          createdAt: Date.now(),
+        })
+        .link({ issue: issueId })
+        .link({ creator: user.id }),
+    ]);
+
+    setReplyContents({ ...replyContents, [issueId]: "" });
+  }
+
+  async function handleToggleIssueStatus(issueId: string, currentStatus: string) {
+    const newStatus = currentStatus === "closed" ? "open" : "closed";
+    await db.transact([
+      db.tx.issues[issueId].update({
+        status: newStatus,
+      }),
+    ]);
+  }
+
+  function getTimeAgo(timestamp: number): string {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
   const { data, isLoading } = db.useQuery({
     contracts: {
       commits: {
@@ -87,6 +174,13 @@ function ContractEditor({ contractId }: { contractId: string }) {
         user: {},
       },
       owner: {},
+      issues: {
+        creator: {},
+        commit: {},
+        comments: {
+          creator: {},
+        },
+      },
       $: { where: { id: contractId } },
     },
   });
@@ -604,266 +698,502 @@ function ContractEditor({ contractId }: { contractId: string }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8">
-        {/* Main content area */}
-        <div className="space-y-4">
-          {/* Tract AI status banner */}
-          {tractStatus && (
-            <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm transition-opacity ${
-                tractStatus.state === "working"
-                  ? "border-accent/30 bg-accent/5"
-                  : tractStatus.state === "done"
-                    ? "border-green-500/30 bg-green-500/5"
-                    : "border-red-500/30 bg-red-500/5"
-              }`}
-            >
-              <span
-                className="inline-flex items-center justify-center w-5 h-5 shrink-0 rounded text-[10px] font-bold"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
-                  color: "white",
-                }}
+      {/* Tabs Switcher */}
+      <div className="flex border-b border-border">
+        <button
+          onClick={() => setActiveTab("document")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-[2px] ${
+            activeTab === "document"
+              ? "border-accent text-accent font-semibold"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Document
+        </button>
+        <button
+          onClick={() => setActiveTab("issues")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-[2px] ${
+            activeTab === "issues"
+              ? "border-accent text-accent font-semibold"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Issues & Discussions
+        </button>
+      </div>
+
+      {activeTab === "issues" ? (
+        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 min-h-[500px]">
+          {/* Left Column: Issues List */}
+          <div className="space-y-4 border-r border-border pr-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Issues List</h3>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-7 px-2"
+                onClick={() => setSelectedIssueId(null)}
               >
-                T
-              </span>
-              <div className="flex-1 min-w-0">
-                {tractStatus.state === "working" && (
-                  <p className="text-muted-foreground">
-                    Tract is working on your request:{" "}
-                    <span className="text-foreground">&ldquo;{tractStatus.prompt}&rdquo;</span>
-                  </p>
-                )}
-                {tractStatus.state === "done" && (
-                  <p className="text-green-600 dark:text-green-400">
-                    Tract finished &mdash; new version available in the commit history
-                  </p>
-                )}
-                {tractStatus.state === "error" && (
-                  <div>
-                    <p className="text-red-600 dark:text-red-400">
-                      Tract failed: {tractStatus.error}
-                    </p>
-                    <button
-                      className="text-xs text-muted-foreground underline mt-1"
-                      onClick={() => setTractStatus(null)}
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                )}
-              </div>
-              {tractStatus.state === "working" && (
-                <div className="shrink-0 w-4 h-4 border-2 border-accent/40 border-t-accent rounded-full animate-spin" />
-              )}
+                + New
+              </Button>
             </div>
-          )}
+            <div className="space-y-2">
+              {(() => {
+                const issues = contract?.issues ?? [];
+                const sorted = [...issues].sort((a: any, b: any) => b.createdAt - a.createdAt);
+                if (sorted.length === 0) {
+                  return <p className="text-xs text-muted-foreground italic">No issues started yet.</p>;
+                }
+                return sorted.map((issue: any) => {
+                  const isSelected = selectedIssueId === issue.id;
+                  const isClosed = issue.status === "closed";
+                  return (
+                    <button
+                      key={issue.id}
+                      onClick={() => setSelectedIssueId(issue.id)}
+                      className={`w-full text-left p-3 rounded-lg border text-xs space-y-1 transition-all ${
+                        isSelected
+                          ? "bg-secondary border-ring/40"
+                          : "bg-card hover:bg-secondary/40 border-border"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                          isClosed ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                        }`}>
+                          {isClosed ? "Closed" : "Active"}
+                        </span>
+                        <span className="text-muted-foreground text-[10px]">
+                          {new Date(issue.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <h4 className="font-medium text-foreground truncate">{issue.title}</h4>
+                      {issue.commit && (
+                        <div className="text-[10px] text-muted-foreground font-mono">
+                          v: {issue.commit.id.slice(0, 7)}
+                        </div>
+                      )}
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          </div>
 
-          {mode === "edit" ? (
-            <>
-              <Textarea
-                className="contract-editor min-h-[500px] resize-y bg-card border-border focus:border-ring/30"
-                value={content ?? ""}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Start writing your contract..."
-                dir="auto"
-                autoFocus
-              />
+          {/* Right Column: Active Issue View or Create Form */}
+          <div className="space-y-4">
+            {(() => {
+              const issues = contract?.issues ?? [];
+              const activeIssue = issues.find((issue: any) => issue.id === selectedIssueId);
 
-              {hasChanges && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-accent/5">
-                    <Input
-                      className="flex-1 text-sm h-9"
-                      placeholder="Description (auto-generated if empty)"
-                      value={commitMsg}
-                      onChange={(e) => {
-                        setCommitMsg(e.target.value);
-                        setCommitError("");
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleCommit();
-                      }}
-                    />
-                    <Button size="sm" onClick={handleCommit} disabled={saving}>
-                      {saving ? "Saving..." : "Commit"}
-                    </Button>
+              if (!activeIssue) {
+                // New Issue Form
+                return (
+                  <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/20">
+                    <h3 className="text-sm font-medium">Create a new issue / discussion thread</h3>
+                    <div className="space-y-3">
+                      <Input
+                        placeholder="Topic or issue title (e.g., 'Clarify section 3 payment terms')"
+                        value={newIssueTitle}
+                        onChange={(e) => setNewIssueTitle(e.target.value)}
+                        className="text-sm"
+                      />
+                      <Textarea
+                        placeholder="Write your feedback or comment here..."
+                        value={newCommentContent}
+                        onChange={(e) => setNewCommentContent(e.target.value)}
+                        className="min-h-[120px] text-sm bg-card"
+                      />
+                      <div className="flex items-center justify-between">
+                        {activeCommitId ? (
+                          <p className="text-[10px] text-muted-foreground">
+                            Linking this issue to currently viewed version: <span className="font-mono">{activeCommitId.slice(0, 7)}</span>
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground">General issue for this contract</p>
+                        )}
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setNewIssueTitle("");
+                              setNewCommentContent("");
+                            }}
+                          >
+                            Clear
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleCreateIssue}
+                            disabled={!newIssueTitle.trim() || !newCommentContent.trim() || !user}
+                          >
+                            Create issue
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  {commitError && (
-                    <div className="text-xs text-red-500 px-3">
-                      {commitError}
+                );
+              }
+
+              const comments = [...(activeIssue.comments ?? [])].sort((a: any, b: any) => a.createdAt - b.createdAt);
+              const isClosed = activeIssue.status === "closed";
+              const creatorEmail = activeIssue.creator?.email ? displayName(activeIssue.creator.email) : "Unknown user";
+
+              return (
+                <div className="space-y-4 p-4 rounded-lg border border-border bg-card">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-border">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          isClosed ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                        }`}>
+                          {isClosed ? "Closed" : "Active"}
+                        </span>
+                        <h2 className="text-base font-semibold">{activeIssue.title}</h2>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Started by {creatorEmail} &middot; {new Date(activeIssue.createdAt).toLocaleDateString()}
+                      </p>
+                      {activeIssue.commit && (
+                        <p className="text-[10px] text-muted-foreground font-mono mt-1">
+                          Associated with version: <span className="underline">{activeIssue.commit.id.slice(0, 7)}</span>
+                        </p>
+                      )}
+                    </div>
+                    {user && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-8"
+                        onClick={() => handleToggleIssueStatus(activeIssue.id, activeIssue.status)}
+                      >
+                        {isClosed ? "Reopen issue" : "Close issue"}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Comments Stream */}
+                  <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 pl-2">
+                    {comments.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">No comments yet.</p>
+                    ) : (
+                      comments.map((comment: any) => {
+                        const commenterEmail = comment.creator?.email ? displayName(comment.creator.email) : "Unknown user";
+                        return (
+                          <div key={comment.id} className="text-xs space-y-1 bg-muted/40 p-3 rounded-lg border border-border/50">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <span className="font-semibold text-foreground">{commenterEmail}</span>
+                              <span>&middot;</span>
+                              <span>{getTimeAgo(comment.createdAt)}</span>
+                            </div>
+                            <p className="text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Reply Form */}
+                  {!isClosed && user && (
+                    <div className="space-y-2 pt-3 border-t border-border">
+                      <Textarea
+                        placeholder="Type your reply here..."
+                        value={replyContents[activeIssue.id] ?? ""}
+                        onChange={(e) => setReplyContents({ ...replyContents, [activeIssue.id]: e.target.value })}
+                        className="min-h-[80px] text-xs"
+                      />
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          onClick={() => handleReply(activeIssue.id)}
+                          disabled={!(replyContents[activeIssue.id] ?? "").trim()}
+                        >
+                          Send reply
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="space-y-3">
-              {/* Approval indicator */}
-              {approvers.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
-                  {approvers.map((p) => (
-                    <span
-                      key={`dot-${p.id}`}
-                      className="inline-block w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: colorMap.get(p.id) ?? "var(--color-muted-foreground)" }}
-                    />
-                  ))}
-                  This is{" "}
-                  {approvers.map((p, i) => {
-                    const isMe = p.user?.id === user?.id;
-                    const pColor = colorMap.get(p.id);
-                    const label = isMe ? "your" : `${displayName(p.email, p.user?.id)}'s`;
-                    return (
-                      <span key={p.id}>
-                        {i > 0 && (i === approvers.length - 1 ? " and " : ", ")}
-                        <span title={p.email || undefined} style={pColor ? { color: pColor } : undefined}>{label}</span>
-                      </span>
-                    );
-                  })}{" "}
-                  version
-                  {approvers.length === uniqueParticipants.length && uniqueParticipants.length >= 2 && (
-                    <Badge variant="default" className="text-[10px] bg-green-600/90 text-white ml-1">
-                      🎉 Consensus
-                    </Badge>
+              );
+            })()}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8">
+          {/* Main content area */}
+          <div className="space-y-4">
+            {/* Tract AI status banner */}
+            {tractStatus && (
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm transition-opacity ${
+                  tractStatus.state === "working"
+                    ? "border-accent/30 bg-accent/5"
+                    : tractStatus.state === "done"
+                      ? "border-green-500/30 bg-green-500/5"
+                      : "border-red-500/30 bg-red-500/5"
+                }`}
+              >
+                <span
+                  className="inline-flex items-center justify-center w-5 h-5 shrink-0 rounded text-[10px] font-bold"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
+                    color: "white",
+                  }}
+                >
+                  T
+                </span>
+                <div className="flex-1 min-w-0">
+                  {tractStatus.state === "working" && (
+                    <p className="text-muted-foreground">
+                      Tract is working on your request:{" "}
+                      <span className="text-foreground">&ldquo;{tractStatus.prompt}&rdquo;</span>
+                    </p>
+                  )}
+                  {tractStatus.state === "done" && (
+                    <p className="text-green-600 dark:text-green-400">
+                      Tract finished &mdash; new version available in the commit history
+                    </p>
+                  )}
+                  {tractStatus.state === "error" && (
+                    <div>
+                      <p className="text-red-600 dark:text-red-400">
+                        Tract failed: {tractStatus.error}
+                      </p>
+                      <button
+                        className="text-xs text-muted-foreground underline mt-1"
+                        onClick={() => setTractStatus(null)}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
                   )}
                 </div>
-              )}
+                {tractStatus.state === "working" && (
+                  <div className="shrink-0 w-4 h-4 border-2 border-accent/40 border-t-accent rounded-full animate-spin" />
+                )}
+              </div>
+            )}
 
-              {/* Contract summary (AI-generated) */}
-              {!isViewingHistory && summary && (
-                <CollapsibleSummary text={summary.text} />
-              )}
+            {mode === "edit" ? (
+              <>
+                <Textarea
+                  className="contract-editor min-h-[500px] resize-y bg-card border-border focus:border-ring/30"
+                  value={content ?? ""}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Start writing your contract..."
+                  dir="auto"
+                  autoFocus
+                />
 
-              {/* Action bar — shown when viewing a historical commit or when the current commit is deletable */}
-              {(isViewingHistory || canDeleteActiveCommit) && (
-                <div className="space-y-2 p-3 rounded-lg border border-accent/30 bg-accent/5">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
-                      {activeCommit?.author?.email
-                        ? <> by <span title={activeCommit.author.email}>{displayName(activeCommit.author.email)}</span></>
-                        : " by Tract"}
-                    </p>
-                    {isViewingHistory && (
-                      <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
-                        Adopt this version
+                {hasChanges && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-accent/5">
+                      <Input
+                        className="flex-1 text-sm h-9"
+                        placeholder="Description (auto-generated if empty)"
+                        value={commitMsg}
+                        onChange={(e) => {
+                          setCommitMsg(e.target.value);
+                          setCommitError("");
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleCommit();
+                        }}
+                      />
+                      <Button size="sm" onClick={handleCommit} disabled={saving}>
+                        {saving ? "Saving..." : "Commit"}
                       </Button>
+                    </div>
+                    {commitError && (
+                      <div className="text-xs text-red-500 px-3">
+                        {commitError}
+                      </div>
                     )}
                   </div>
-                  {activeCommit?.message && (
-                    <p className="text-xs text-muted-foreground italic">{activeCommit.message}</p>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => setCommitDetailOpen(true)}
-                    >
-                      View changes from parent
-                    </Button>
-                    {canDeleteActiveCommit && (
+                )}
+              </>
+            ) : (
+              <div className="space-y-3">
+                {/* Approval indicator */}
+                {approvers.length > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+                    {approvers.map((p) => (
+                      <span
+                        key={`dot-${p.id}`}
+                        className="inline-block w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: colorMap.get(p.id) ?? "var(--color-muted-foreground)" }}
+                      />
+                    ))}
+                    This is{" "}
+                    {approvers.map((p, i) => {
+                      const isMe = p.user?.id === user?.id;
+                      const pColor = colorMap.get(p.id);
+                      const label = isMe ? "your" : `${displayName(p.email, p.user?.id)}'s`;
+                      return (
+                        <span key={p.id}>
+                          {i > 0 && (i === approvers.length - 1 ? " and " : ", ")}
+                          <span title={p.email || undefined} style={pColor ? { color: pColor } : undefined}>{label}</span>
+                        </span>
+                      );
+                    })}{" "}
+                    version
+                    {approvers.length === uniqueParticipants.length && uniqueParticipants.length >= 2 && (
+                      <Badge variant="default" className="text-[10px] bg-green-600/90 text-white ml-1">
+                        🎉 Consensus
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
+                {/* Contract summary (AI-generated) */}
+                {!isViewingHistory && summary && (
+                  <CollapsibleSummary text={summary.text} />
+                )}
+
+                {/* Action bar — shown when viewing a historical commit or when the current commit is deletable */}
+                {(isViewingHistory || canDeleteActiveCommit) && (
+                  <div className="space-y-2 p-3 rounded-lg border border-accent/30 bg-accent/5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
+                        {activeCommit?.author?.email
+                          ? <> by <span title={activeCommit.author.email}>{displayName(activeCommit.author.email)}</span></>
+                          : " by Tract"}
+                      </p>
+                      {isViewingHistory && (
+                        <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
+                          Adopt this version
+                        </Button>
+                      )}
+                    </div>
+                    {activeCommit?.message && (
+                      <p className="text-xs text-muted-foreground italic">{activeCommit.message}</p>
+                    )}
+                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-xs text-destructive hover:text-destructive"
-                        onClick={() => setDeleteOpen(true)}
+                        className="text-xs"
+                        onClick={() => setCommitDetailOpen(true)}
                       >
-                        Delete this commit
+                        View changes from parent
                       </Button>
-                    )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          setSelectedIssueId(null);
+                          setNewIssueTitle(`Discussion on version ${activeCommitId?.slice(0, 7)}`);
+                          setActiveTab("issues");
+                        }}
+                      >
+                        Comment on this version
+                      </Button>
+                      {canDeleteActiveCommit && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs text-destructive hover:text-destructive"
+                          onClick={() => setDeleteOpen(true)}
+                        >
+                          Delete this commit
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              <div className="relative min-h-[500px] px-8 py-6 rounded-lg border border-border bg-card">
-                {mode === "view" && displayContent.trim() && (
-                  <button
-                    className="absolute top-3 start-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => {
-                      navigator.clipboard.writeText(displayContent);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }}
-                  >
-                    {copied ? "Copied" : "Copy"}
-                  </button>
                 )}
-                {isViewingHistory ? (
-                  <InlineDiffView
-                    baseContent={headCommit?.content ?? ""}
-                    compareContent={activeCommit?.content ?? ""}
-                  />
-                ) : (
-                  <MarkdownView content={displayContent} />
+
+                <div className="relative min-h-[500px] px-8 py-6 rounded-lg border border-border bg-card">
+                  {mode === "view" && displayContent.trim() && (
+                    <button
+                      className="absolute top-3 start-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => {
+                        navigator.clipboard.writeText(displayContent);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                    >
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  )}
+                  {isViewingHistory ? (
+                    <InlineDiffView
+                      baseContent={headCommit?.content ?? ""}
+                      compareContent={activeCommit?.content ?? ""}
+                    />
+                  ) : (
+                    <MarkdownView content={displayContent} />
+                  )}
+                </div>
+
+                {/* History for this version */}
+                {versionHistory.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      History for this version
+                    </h3>
+                    <div className="space-y-1">
+                      {versionHistory.map((c) => {
+                        const authorLabel = c.author?.email
+                          ? displayName(c.author.email)
+                          : "Tract";
+                        const date = new Date(c.createdAt);
+                        return (
+                          <div key={c.id} className="text-xs text-muted-foreground py-1.5 border-b border-border/50 last:border-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[10px]">{c.id.slice(0, 7)}</span>
+                              <span title={c.author?.email || undefined}>{authorLabel}</span>
+                              <span className="text-muted-foreground/50">·</span>
+                              <span className="text-muted-foreground/50">
+                                {date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                              </span>
+                            </div>
+                            {c.message && (
+                              <p className="mt-0.5 text-foreground/70 whitespace-pre-wrap">{c.message}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
+            )}
+          </div>
 
-              {/* History for this version */}
-              {versionHistory.length > 0 && (
-                <div className="space-y-2 pt-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    History for this version
-                  </h3>
-                  <div className="space-y-1">
-                    {versionHistory.map((c) => {
-                      const authorLabel = c.author?.email
-                        ? displayName(c.author.email)
-                        : "Tract";
-                      const date = new Date(c.createdAt);
-                      return (
-                        <div key={c.id} className="text-xs text-muted-foreground py-1.5 border-b border-border/50 last:border-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[10px]">{c.id.slice(0, 7)}</span>
-                            <span title={c.author?.email || undefined}>{authorLabel}</span>
-                            <span className="text-muted-foreground/50">·</span>
-                            <span className="text-muted-foreground/50">
-                              {date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                            </span>
-                          </div>
-                          {c.message && (
-                            <p className="mt-0.5 text-foreground/70 whitespace-pre-wrap">{c.message}</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <ParticipantList
+              participants={participants}
+              commits={commits}
+              currentUserId={user?.id ?? ""}
+              contractId={contractId}
+              myHeadCommitId={myHeadCommitId}
+              onSelectVersion={handleSelectCommit}
+              onRemove={isOwner ? handleRemoveParticipant : undefined}
+              isOwner={isOwner}
+              colorMap={colorMap}
+            />
+
+            <Separator />
+
+            <CommitLog
+              commits={commits}
+              headCommitId={myHeadCommitId}
+              viewingCommitId={activeCommitId}
+              participants={participants}
+              currentUserId={user?.id ?? ""}
+              onSelectCommit={handleSelectCommit}
+              onCheckout={handleCheckout}
+              colorMap={colorMap}
+            />
+          </div>
         </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <ParticipantList
-            participants={participants}
-            commits={commits}
-            currentUserId={user?.id ?? ""}
-            contractId={contractId}
-            myHeadCommitId={myHeadCommitId}
-            onSelectVersion={handleSelectCommit}
-            onRemove={isOwner ? handleRemoveParticipant : undefined}
-            isOwner={isOwner}
-            colorMap={colorMap}
-          />
-
-          <Separator />
-
-          <CommitLog
-            commits={commits}
-            headCommitId={myHeadCommitId}
-            viewingCommitId={activeCommitId}
-            participants={participants}
-            currentUserId={user?.id ?? ""}
-            onSelectCommit={handleSelectCommit}
-            onCheckout={handleCheckout}
-            colorMap={colorMap}
-          />
-        </div>
-      </div>
+      )}
 
       <InviteDialog
         contractId={contractId}

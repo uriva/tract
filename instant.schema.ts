@@ -26,6 +26,15 @@ const _schema = i.schema({
       signedAt: i.number().optional(),
       inviteType: i.string().optional(), // "one-time" | "unlimited"
     }),
+    issues: i.entity({
+      title: i.string(),
+      createdAt: i.number().indexed(),
+      status: i.string(), // "open" | "closed"
+    }),
+    comments: i.entity({
+      content: i.string(),
+      createdAt: i.number().indexed(),
+    }),
   },
   links: {
     contractCommits: {
@@ -100,6 +109,69 @@ const _schema = i.schema({
         on: "$users",
         has: "many",
         label: "ownedContracts",
+      },
+    },
+    issueContract: {
+      forward: {
+        on: "issues",
+        has: "one",
+        label: "contract",
+        onDelete: "cascade",
+      },
+      reverse: {
+        on: "contracts",
+        has: "many",
+        label: "issues",
+      },
+    },
+    issueCommit: {
+      forward: {
+        on: "issues",
+        has: "one",
+        label: "commit",
+        onDelete: "cascade",
+      },
+      reverse: {
+        on: "commits",
+        has: "many",
+        label: "issues",
+      },
+    },
+    issueCreator: {
+      forward: {
+        on: "issues",
+        has: "one",
+        label: "creator",
+      },
+      reverse: {
+        on: "$users",
+        has: "many",
+        label: "issues",
+      },
+    },
+    commentIssue: {
+      forward: {
+        on: "comments",
+        has: "one",
+        label: "issue",
+        onDelete: "cascade",
+      },
+      reverse: {
+        on: "issues",
+        has: "many",
+        label: "comments",
+      },
+    },
+    commentCreator: {
+      forward: {
+        on: "comments",
+        has: "one",
+        label: "creator",
+      },
+      reverse: {
+        on: "$users",
+        has: "many",
+        label: "comments",
       },
     },
   },
