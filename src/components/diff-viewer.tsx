@@ -355,7 +355,7 @@ function DiffLine({
           isUnchanged ? "" : isAdded ? "diff-line-added" : "diff-line-removed"
         }`}
       >
-        {/* Hover comment / checkbox column */}
+        {/* Checkbox column */}
         <div className="w-8 shrink-0 flex items-center justify-center relative">
           {isFirstInHunk && !isUnchanged && (
             <Checkbox
@@ -364,6 +364,10 @@ function DiffLine({
               className="h-3.5 w-3.5 z-10"
             />
           )}
+        </div>
+
+        {/* Comment button column */}
+        <div className="w-6 shrink-0 flex items-center justify-center relative">
           {user && (
             <button
               onClick={() => {
@@ -374,12 +378,11 @@ function DiffLine({
                   setNewCommentInput("");
                 }
               }}
-              className={`absolute p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-all z-10 ${
+              className={`p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-all z-10 ${
                 showCommentForm
                   ? "opacity-100 bg-accent text-foreground"
                   : "opacity-0 group-hover/row:opacity-100"
               }`}
-              style={{ left: "4px" }}
               title="Comment on this line"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
