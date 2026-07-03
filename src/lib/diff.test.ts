@@ -83,4 +83,17 @@ describe("diff and applySelectedChanges with normalized whitespace", () => {
     // Both paragraphs should be successfully paired despite being separated by empty lines/unchanged parts
     expect(paired.size).toBe(4); // 2 removed lines + 2 added lines should have word segment mappings
   });
+
+  it("always merges from target text into base text correctly", () => {
+    const baseText = "Our line 1\nOur line 2\n";
+    const targetText = "Their line 1\nOur line 2\n";
+
+    const { diffs } = computeLineDiffs(baseText, targetText);
+    const approved = new Set([0, 1]);
+    const resultWithApproval = applySelectedChanges(baseText, targetText, approved);
+    expect(resultWithApproval).toBe("Their line 1\nOur line 2\n");
+
+    const resultWithoutApproval = applySelectedChanges(baseText, targetText, new Set());
+    expect(resultWithoutApproval).toBe("Our line 1\nOur line 2\n");
+  });
 });
