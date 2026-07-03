@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 import { displayName } from "@/lib/utils";
+import { computeLineDiffs } from "@/lib/diff";
 
 interface Participant {
   id: string;
@@ -27,6 +28,7 @@ interface Commit {
   id: string;
   createdAt: number;
   parent?: { id: string };
+  content?: string;
 }
 
 interface ParticipantListProps {
@@ -110,6 +112,7 @@ export function ParticipantList({
 
         // Determine relationship by walking the DAG
         let status: "agreement" | "has-notes" | "yet-to-approve" | "diverged" | "unknown" = "unknown";
+        let conflictCount = 0;
         if (sameCommit) {
           status = "agreement";
         } else if (myHeadCommitId && theirHead) {
@@ -124,17 +127,38 @@ export function ParticipantList({
           } else {
             status = "diverged"; // parallel branches
           }
+
+          if (status === "diverged" || status === "has-notes") {
+            const myCommit = commitMap.get(myHeadCommitId);
+            const theirCommit = commitMap.get(theirHead);
+            if (myCommit?.content !== undefined && theirCommit?.content !== undefined) {
+              const { diffs } = computeLineDiffs(myCommit.content, theirCommit.content);
+              let hunks = 0;
+              let inHunk = false;
+              for (const d of diffs) {
+                if (d.type !== "unchanged") {
+                  if (!inHunk) {
+                    hunks++;
+                    inHunk = true;
+                  }
+                } else {
+                  inHunk = false;
+                }
+              }
+              conflictCount = hunks;
+            }
+          }
         }
 
         return (
           <div key={p.id} className="group flex items-center justify-between gap-2 py-1">
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <div
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ backgroundColor: colorMap?.get(p.id) ?? "var(--color-muted-foreground)" }}
               />
               <span
-                className={`text-sm truncate ${p.headCommitId && onSelectVersion ? "cursor-pointer hover:text-accent transition-colors" : ""}`}
+                className={`text-sm truncate min-w-0 flex-1 ${p.headCommitId && onSelectVersion ? "cursor-pointer hover:text-accent transition-colors" : ""}`}
                 title={p.email || undefined}
                 onClick={() => p.headCommitId && onSelectVersion?.(p.headCommitId)}
               >{displayName(p.email, p.user?.id)}</span>
@@ -143,11 +167,11 @@ export function ParticipantList({
               </Badge>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               {status === "has-notes" && (
                 <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
                   <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10">
-                    has notes
+                    has notes {conflictCount > 0 ? `(${conflictCount})` : ""}
                   </Button>
                 </Link>
               )}
@@ -155,7 +179,7 @@ export function ParticipantList({
               {status === "diverged" && (
                 <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
                   <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10">
-                    resolve conflicts
+                    resolve conflicts {conflictCount > 0 ? `(${conflictCount})` : ""}
                   </Button>
                 </Link>
               )}

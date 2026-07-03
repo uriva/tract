@@ -69,6 +69,18 @@ export function DiffViewer({
 
   const [approved, setApproved] = useState<Set<number>>(new Set());
 
+  const totalHunkCount = hunkInfo.isFirstInHunk.size;
+
+  const approvedHunkCount = useMemo(() => {
+    let count = 0;
+    for (const startIndex of hunkInfo.isFirstInHunk) {
+      if (approved.has(startIndex)) {
+        count++;
+      }
+    }
+    return count;
+  }, [approved, hunkInfo.isFirstInHunk]);
+
   function toggleHunk(index: number) {
     const start = hunkInfo.hunkStart.get(index);
     const end = hunkInfo.hunkEnd.get(index);
@@ -107,7 +119,7 @@ export function DiffViewer({
 
   function handleApply() {
     const newContent = applySelectedChanges(myContent, theirContent, approved);
-    onApprove(newContent, approved.size, changedIndices.length);
+    onApprove(newContent, approvedHunkCount, totalHunkCount);
   }
 
   if (!hasChanges) {
@@ -124,8 +136,8 @@ export function DiffViewer({
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground">
-            {changedIndices.length} change{changedIndices.length !== 1 ? "s" : ""} &middot;{" "}
-            {approved.size} selected
+            {totalHunkCount} change{totalHunkCount !== 1 ? "s" : ""} &middot;{" "}
+            {approvedHunkCount} selected
           </span>
           <Button
             variant="ghost"
@@ -148,11 +160,11 @@ export function DiffViewer({
         <Button
           size="sm"
           onClick={handleApply}
-          disabled={approved.size === 0 || applying}
+          disabled={approvedHunkCount === 0 || applying}
         >
           {applying
             ? "Applying..."
-            : `Apply ${approved.size} change${approved.size !== 1 ? "s" : ""}`}
+            : `Apply ${approvedHunkCount} change${approvedHunkCount !== 1 ? "s" : ""}`}
         </Button>
       </div>
 
