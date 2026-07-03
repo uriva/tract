@@ -455,10 +455,10 @@ function DiffLine({
                       {isClosed ? "Closed" : "Active"}
                     </span>
                     <span className="font-semibold text-foreground">
-                      {issue.creator?.email ? displayName(issue.creator.email) : "Unknown"}
+                      Inline Discussion
                     </span>
                   </div>
-                  <span>{new Date(issue.createdAt).toLocaleDateString()}</span>
+                  <span>{new Date(issue.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
                 </div>
 
                 {/* Comment list */}

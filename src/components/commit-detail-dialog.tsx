@@ -42,8 +42,11 @@ export function CommitDetailDialog({
 
   const date = new Date(commit.createdAt);
   const dateStr = date.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 
   return (

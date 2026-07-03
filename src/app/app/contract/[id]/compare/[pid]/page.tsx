@@ -334,7 +334,7 @@ function CompareView({
             <span className="text-xs font-mono">{myHead.id.slice(0, 7)}</span>
             <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
             <span className="text-[10px] text-muted-foreground">
-              {new Date(myHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+              {new Date(myHead.createdAt).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
             </span>
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
@@ -351,7 +351,7 @@ function CompareView({
             <span className="text-xs font-mono">{theirHead.id.slice(0, 7)}</span>
             <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
             <span className="text-[10px] text-muted-foreground">
-              {new Date(theirHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+              {new Date(theirHead.createdAt).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
             </span>
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
@@ -461,7 +461,7 @@ function CompareView({
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-muted-foreground">
-                                Started by {creatorEmail} &middot; {new Date(issue.createdAt).toLocaleDateString()}
+                                Started by {creatorEmail} &middot; {new Date(issue.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
                               </span>
                               {user && (
                                 <Button

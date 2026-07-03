@@ -764,7 +764,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                           {isClosed ? "Closed" : "Active"}
                         </span>
                         <span className="text-muted-foreground text-[10px]">
-                          {new Date(issue.createdAt).toLocaleDateString()}
+                          {new Date(issue.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
                         </span>
                       </div>
                       <h4 className="font-medium text-foreground truncate">{issue.title}</h4>
@@ -854,7 +854,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                         <h2 className="text-base font-semibold">{activeIssue.title}</h2>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Started by {creatorEmail} &middot; {new Date(activeIssue.createdAt).toLocaleDateString()}
+                        Started by {creatorEmail} &middot; {new Date(activeIssue.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                       {activeIssue.commit && (
                         <p className="text-[10px] text-muted-foreground font-mono mt-1">
@@ -1149,7 +1149,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                               <span title={c.author?.email || undefined}>{authorLabel}</span>
                               <span className="text-muted-foreground/50">·</span>
                               <span className="text-muted-foreground/50">
-                                {date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                                {date.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
                               </span>
                             </div>
                             {c.message && (

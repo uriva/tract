@@ -44,7 +44,7 @@ export default {
   },
   comments: {
     allow: {
-      view: "auth.id in data.ref('issue.contract.participants.user.id')",
+      view: "auth.id != null",
       create: "auth.id != null",
       update: "auth.id in data.ref('creator.id')",
       delete: "auth.id in data.ref('creator.id')",
