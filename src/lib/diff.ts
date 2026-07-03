@@ -143,17 +143,17 @@ export function pairWordDiffs(diffs: LineDiff[]): Map<number, WordSegment[]> {
   const N = A_indices.length;
   if (M === 0 || N === 0) return segments;
 
-  const dp = Array.from({ length: M + 1 }, () => Array(N + 1).fill(0));
-  const parent = Array.from({ length: M + 1 }, () => Array(N + 1).fill(null));
+  const dp = Array.from({ length: M + 1 }, () => new Float32Array(N + 1));
+  const parent = new Uint8Array((M + 1) * (N + 1));
 
   for (let r = 1; r <= M; r++) {
     for (let a = 1; a <= N; a++) {
       let best = dp[r - 1][a];
-      let choice: { type: "skip_r" | "skip_a" | "pair"; sim?: number } = { type: "skip_r" };
+      let choice = 1; // 1 = skip_r
 
       if (dp[r][a - 1] > best) {
         best = dp[r][a - 1];
-        choice = { type: "skip_a" };
+        choice = 2; // 2 = skip_a
       }
 
       const ri = R_indices[r - 1];
@@ -166,21 +166,21 @@ export function pairWordDiffs(diffs: LineDiff[]): Map<number, WordSegment[]> {
         const scoreWithPair = dp[r - 1][a - 1] + sim;
         if (scoreWithPair > best) {
           best = scoreWithPair;
-          choice = { type: "pair" as const, sim };
+          choice = 3; // 3 = pair
         }
       }
 
       dp[r][a] = best;
-      parent[r][a] = choice;
+      parent[r * (N + 1) + a] = choice;
     }
   }
 
   let r_curr = M;
   let a_curr = N;
   while (r_curr > 0 && a_curr > 0) {
-    const choice = parent[r_curr][a_curr];
-    if (!choice) break;
-    if (choice.type === "pair") {
+    const choice = parent[r_curr * (N + 1) + a_curr];
+    if (choice === 0) break;
+    if (choice === 3) {
       const ri = R_indices[r_curr - 1];
       const ai = A_indices[a_curr - 1];
       const { removedSegments, addedSegments } = computeWordSegments(
@@ -191,7 +191,7 @@ export function pairWordDiffs(diffs: LineDiff[]): Map<number, WordSegment[]> {
       segments.set(ai, addedSegments);
       r_curr--;
       a_curr--;
-    } else if (choice.type === "skip_r") {
+    } else if (choice === 1) {
       r_curr--;
     } else {
       a_curr--;
