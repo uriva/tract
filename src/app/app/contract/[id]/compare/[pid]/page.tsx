@@ -164,83 +164,51 @@ function CompareView({
           </Button>
           <h1 className="text-xl font-semibold tracking-tight">Compare changes</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {isTheirVersionLater ? (
-              <>
-                Your version vs. <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version
-              </>
-            ) : (
-              <>
-                <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version vs. Your version
-              </>
-            )}
+            Your version vs. <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version
           </p>
         </div>
       </div>
 
       {/* Version info */}
       <div className="grid grid-cols-2 gap-4">
-        {isTheirVersionLater ? (
-          <>
-            <div className="p-3 rounded-lg border border-border bg-card">
-              <div className="text-xs text-muted-foreground">Your version (earlier)</div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs font-mono">{myHead.id.slice(0, 7)}</span>
-                <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {new Date(myHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
-            </div>
-            <div className="p-3 rounded-lg border border-border bg-card">
-              <div className="text-xs text-muted-foreground">
-                <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version (later)
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs font-mono">{theirHead.id.slice(0, 7)}</span>
-                <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {new Date(theirHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="p-3 rounded-lg border border-border bg-card">
-              <div className="text-xs text-muted-foreground">
-                <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version (earlier)
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs font-mono">{theirHead.id.slice(0, 7)}</span>
-                <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {new Date(theirHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
-            </div>
-            <div className="p-3 rounded-lg border border-border bg-card">
-              <div className="text-xs text-muted-foreground">Your version (later)</div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs font-mono">{myHead.id.slice(0, 7)}</span>
-                <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {new Date(myHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
-            </div>
-          </>
-        )}
+        {/* Left Card: Your version */}
+        <div className="p-3 rounded-lg border border-border bg-card">
+          <div className="text-xs text-muted-foreground">
+            Your version {isTheirVersionLater ? "(earlier)" : "(later)"}
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs font-mono">{myHead.id.slice(0, 7)}</span>
+            <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
+            <span className="text-[10px] text-muted-foreground">
+              {new Date(myHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
+        </div>
+
+        {/* Right Card: Their version */}
+        <div className="p-3 rounded-lg border border-border bg-card">
+          <div className="text-xs text-muted-foreground">
+            <span title={theirParticipant.email || undefined}>
+              {displayName(theirParticipant.email, theirParticipant.user?.id)}
+            </span>&apos;s version {isTheirVersionLater ? "(later)" : "(earlier)"}
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs font-mono">{theirHead.id.slice(0, 7)}</span>
+            <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
+            <span className="text-[10px] text-muted-foreground">
+              {new Date(theirHead.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
+        </div>
       </div>
 
       {/* Diff viewer */}
       <DiffViewer
         key={`${myHead.id}-${theirHead.id}`}
-        myContent={isTheirVersionLater ? myHead.content : theirHead.content}
-        theirContent={isTheirVersionLater ? theirHead.content : myHead.content}
+        myContent={myHead.content}
+        theirContent={theirHead.content}
         theirEmail={displayName(theirParticipant.email, theirParticipant.user?.id)}
         onApprove={handleApprove}
         applying={applying}
