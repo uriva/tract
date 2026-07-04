@@ -43,7 +43,7 @@ export function ProseBlock({
   const lineIssues = useMemo(() => {
     if (lineNumber === undefined) return [];
     return issues.filter(
-      (issue) => issue.lineNumber === lineNumber && issue.lineType === "unchanged"
+      (issue) => issue.lineNumber === lineNumber
     );
   }, [issues, lineNumber]);
 
