@@ -15,6 +15,7 @@ import { ParticipantList } from "@/components/participant-list";
 import { CommitLog } from "@/components/commit-log";
 import { InviteDialog } from "@/components/invite-dialog";
 import { TractDialog } from "@/components/tract-dialog";
+import { MarkdownView } from "@/components/markdown-view";
 import { DiffViewer } from "@/components/diff-viewer";
 import { CommitDetailDialog } from "@/components/commit-detail-dialog";
 import {
@@ -1149,7 +1150,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     <div className="text-sm text-muted-foreground italic py-8 text-center">
                       Empty document
                     </div>
-                  ) : (
+                  ) : isViewingHistory ? (
                     <DiffViewer
                       key={`${headCommit?.id}-${activeCommit?.id}`}
                       myContent={headCommit?.content ?? ""}
@@ -1158,6 +1159,13 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       contractId={contractId}
                       commitId={activeCommit?.id}
                       issues={contract?.issues ?? []}
+                    />
+                  ) : (
+                    <MarkdownView
+                      content={displayContent}
+                      issues={contract?.issues ?? []}
+                      contractId={contractId}
+                      commitId={activeCommit?.id}
                     />
                   )}
                 </div>
