@@ -21,6 +21,41 @@ interface DiffViewerProps {
   issues?: any[];
 }
 
+function getLineIssues(diff: LineDiff, issues: any[], commitId?: string) {
+  return issues.filter((issue) => {
+    if (issue.lineNumber === undefined) return false;
+
+    // 1. Strict match on lineNumber and lineType (always safe and backward compatible)
+    if (issue.lineNumber === diff.lineNumber && issue.lineType === diff.type) {
+      return true;
+    }
+
+    // 2. If the issue is associated with the viewed/target commit (theirContent / Nizzan's version)
+    if (commitId && issue.commit?.id === commitId) {
+      // In this diff, lines from theirContent are either "added" or "unchanged",
+      // and their line number in theirContent is diff.lineNumber
+      const isTheirLine = diff.type === "added" || diff.type === "unchanged";
+      if (isTheirLine && diff.lineNumber === issue.lineNumber) {
+        return true;
+      }
+    }
+
+    // 3. If the issue is associated with the base commit (myContent / our own head version)
+    // or has no commit link, we map it to myContent's lines
+    if (!commitId || (issue.commit?.id && issue.commit.id !== commitId)) {
+      // In this diff, lines from myContent are either "removed" or "unchanged",
+      // and their line number in myContent is diff.type === "removed" ? diff.lineNumber : diff.originalLineNumber
+      const isMyLine = diff.type === "removed" || diff.type === "unchanged";
+      const myLineNumber = diff.type === "removed" ? diff.lineNumber : diff.originalLineNumber;
+      if (isMyLine && myLineNumber === issue.lineNumber) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+}
+
 export function DiffViewer({
   myContent,
   theirContent,
@@ -35,19 +70,6 @@ export function DiffViewer({
   const [commentReplyContents, setCommentReplyContents] = useState<{ [issueId: string]: string }>({});
   const [activeCommentLine, setActiveCommentLine] = useState<{ lineNumber: number; lineType: string } | null>(null);
   const [newCommentInput, setNewCommentInput] = useState("");
-
-  const lineIssuesMap = useMemo(() => {
-    const map = new Map<string, any[]>();
-    for (const issue of issues) {
-      if (issue.lineNumber !== undefined && issue.lineType !== undefined) {
-        const key = `${issue.lineNumber}-${issue.lineType}`;
-        const arr = map.get(key) ?? [];
-        arr.push(issue);
-        map.set(key, arr);
-      }
-    }
-    return map;
-  }, [issues]);
 
   async function handleCreateInlineComment(lineNumber: number, lineType: string, content: string) {
     if (!user || !contractId || !content.trim()) return;
@@ -293,7 +315,7 @@ export function DiffViewer({
               onToggle={toggleHunk}
               wordSegments={wordSegments.get(i)}
               isFirstInHunk={hunkInfo.isFirstInHunk.has(i)}
-              lineIssues={lineIssuesMap.get(`${diff.lineNumber}-${diff.type}`) ?? []}
+              lineIssues={getLineIssues(diff, issues, commitId)}
               user={user}
               activeCommentLine={activeCommentLine}
               setActiveCommentLine={setActiveCommentLine}
