@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { InlineDiffView } from "@/components/inline-diff-view";
+import { DiffViewer } from "@/components/diff-viewer";
 import { displayName } from "@/lib/utils";
 
 interface Commit {
@@ -25,6 +24,8 @@ interface CommitDetailDialogProps {
   parentCommit: Commit | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  contractId?: string;
+  issues?: any[];
 }
 
 export function CommitDetailDialog({
@@ -32,6 +33,8 @@ export function CommitDetailDialog({
   parentCommit,
   open,
   onOpenChange,
+  contractId,
+  issues = [],
 }: CommitDetailDialogProps) {
   if (!commit) return null;
 
@@ -67,10 +70,15 @@ export function CommitDetailDialog({
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 shrink-0">
             Changes
           </div>
-          <div className="flex-1 min-h-0 rounded-lg border border-border overflow-y-auto">
-            <InlineDiffView
-              baseContent={parentCommit?.content ?? ""}
-              compareContent={commit.content}
+          <div className="flex-1 min-h-0 rounded-lg border border-border overflow-y-auto p-4">
+            <DiffViewer
+              key={`${parentCommit?.id}-${commit.id}`}
+              myContent={parentCommit?.content ?? ""}
+              theirContent={commit.content}
+              theirEmail={commit.author?.email ?? "Tract"}
+              contractId={contractId}
+              commitId={commit.id}
+              issues={issues}
             />
           </div>
         </div>

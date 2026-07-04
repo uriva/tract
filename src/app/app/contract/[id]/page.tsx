@@ -16,7 +16,7 @@ import { CommitLog } from "@/components/commit-log";
 import { InviteDialog } from "@/components/invite-dialog";
 import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
-import { InlineDiffView } from "@/components/inline-diff-view";
+import { DiffViewer } from "@/components/diff-viewer";
 import { CommitDetailDialog } from "@/components/commit-detail-dialog";
 import {
   Dialog,
@@ -1121,9 +1121,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     </button>
                   )}
                   {isViewingHistory ? (
-                    <InlineDiffView
-                      baseContent={headCommit?.content ?? ""}
-                      compareContent={activeCommit?.content ?? ""}
+                    <DiffViewer
+                      key={`${headCommit?.id}-${activeCommit?.id}`}
+                      myContent={headCommit?.content ?? ""}
+                      theirContent={activeCommit?.content ?? ""}
+                      theirEmail={activeCommit?.author?.email ?? "Tract"}
+                      contractId={contractId}
+                      commitId={activeCommit?.id}
+                      issues={contract?.issues ?? []}
                     />
                   ) : (
                     <MarkdownView content={displayContent} />
@@ -1215,6 +1220,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
         parentCommit={activeParentCommit}
         open={commitDetailOpen}
         onOpenChange={setCommitDetailOpen}
+        contractId={contractId}
+        issues={contract?.issues ?? []}
       />
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

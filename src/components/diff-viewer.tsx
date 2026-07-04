@@ -14,7 +14,7 @@ interface DiffViewerProps {
   myContent: string;
   theirContent: string;
   theirEmail: string;
-  onApprove: (newContent: string, approvedCount: number, totalCount: number) => void;
+  onApprove?: (newContent: string, approvedCount: number, totalCount: number) => void;
   applying?: boolean;
   contractId?: string;
   commitId?: string;
@@ -220,6 +220,7 @@ export function DiffViewer({
   }
 
   function handleApply() {
+    if (!onApprove) return;
     const newContent = applySelectedChanges(myContent, theirContent, approved);
     onApprove(newContent, approvedHunkCount, totalHunkCount);
   }
@@ -235,40 +236,48 @@ export function DiffViewer({
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">
-            {totalHunkCount} change{totalHunkCount !== 1 ? "s" : ""} &middot;{" "}
-            {approvedHunkCount} selected
-          </span>
+      {onApprove ? (
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">
+              {totalHunkCount} change{totalHunkCount !== 1 ? "s" : ""} &middot;{" "}
+              {approvedHunkCount} selected
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-7"
+              onClick={selectAll}
+            >
+              Select all
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-7"
+              onClick={selectNone}
+            >
+              Clear
+            </Button>
+          </div>
+
           <Button
-            variant="ghost"
             size="sm"
-            className="text-xs h-7"
-            onClick={selectAll}
+            onClick={handleApply}
+            disabled={approvedHunkCount === 0 || applying}
           >
-            Select all
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs h-7"
-            onClick={selectNone}
-          >
-            Clear
+            {applying
+              ? "Applying..."
+              : `Apply ${approvedHunkCount} change${approvedHunkCount !== 1 ? "s" : ""}`}
           </Button>
         </div>
-
-        <Button
-          size="sm"
-          onClick={handleApply}
-          disabled={approvedHunkCount === 0 || applying}
-        >
-          {applying
-            ? "Applying..."
-            : `Apply ${approvedHunkCount} change${approvedHunkCount !== 1 ? "s" : ""}`}
-        </Button>
-      </div>
+      ) : (
+        <div className="py-1 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {totalHunkCount} change{totalHunkCount !== 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
 
       {/* Diff lines */}
       <div className="rounded-lg border border-border">
@@ -293,6 +302,7 @@ export function DiffViewer({
               onCreateComment={handleCreateInlineComment}
               onReplyComment={handleReplyInlineComment}
               getTimeAgo={getTimeAgo}
+              readOnly={!onApprove}
             />
           ))}
         </div>
@@ -319,6 +329,7 @@ interface DiffLineProps {
   onCreateComment: (lineNumber: number, lineType: string, content: string) => Promise<void>;
   onReplyComment: (issueId: string, content: string) => Promise<void>;
   getTimeAgo: (timestamp: number) => string;
+  readOnly?: boolean;
 }
 
 function DiffLine({
@@ -339,6 +350,7 @@ function DiffLine({
   onCreateComment,
   onReplyComment,
   getTimeAgo,
+  readOnly = false,
 }: DiffLineProps) {
   const isUnchanged = diff.type === "unchanged";
   const isAdded = diff.type === "added";
@@ -356,15 +368,17 @@ function DiffLine({
         }`}
       >
         {/* Checkbox column */}
-        <div className="w-8 shrink-0 flex items-center justify-center relative">
-          {isFirstInHunk && !isUnchanged && (
-            <Checkbox
-              checked={isApproved}
-              onCheckedChange={() => onToggle(index)}
-              className="h-3.5 w-3.5 z-10"
-            />
-          )}
-        </div>
+        {!readOnly && (
+          <div className="w-8 shrink-0 flex items-center justify-center relative">
+            {isFirstInHunk && !isUnchanged && (
+              <Checkbox
+                checked={isApproved}
+                onCheckedChange={() => onToggle(index)}
+                className="h-3.5 w-3.5 z-10"
+              />
+            )}
+          </div>
+        )}
 
         {/* Comment button column */}
         <div className="w-6 shrink-0 flex items-center justify-center relative">
