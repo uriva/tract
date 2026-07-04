@@ -225,7 +225,7 @@ export function DiffViewer({
     onApprove(newContent, approvedHunkCount, totalHunkCount);
   }
 
-  if (!hasChanges) {
+  if (!hasChanges && onApprove) {
     return (
       <div className="text-sm text-muted-foreground py-8 text-center">
         No differences. You and {theirEmail} are in sync.
@@ -272,11 +272,13 @@ export function DiffViewer({
           </Button>
         </div>
       ) : (
-        <div className="py-1 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {totalHunkCount} change{totalHunkCount !== 1 ? "s" : ""}
-          </span>
-        </div>
+        totalHunkCount > 0 && (
+          <div className="py-1 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {totalHunkCount} change{totalHunkCount !== 1 ? "s" : ""}
+            </span>
+          </div>
+        )
       )}
 
       {/* Diff lines */}

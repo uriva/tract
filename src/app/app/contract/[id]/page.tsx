@@ -15,7 +15,6 @@ import { ParticipantList } from "@/components/participant-list";
 import { CommitLog } from "@/components/commit-log";
 import { InviteDialog } from "@/components/invite-dialog";
 import { TractDialog } from "@/components/tract-dialog";
-import { MarkdownView } from "@/components/markdown-view";
 import { DiffViewer } from "@/components/diff-viewer";
 import { CommitDetailDialog } from "@/components/commit-detail-dialog";
 import {
@@ -769,8 +768,22 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       </div>
                       <h4 className="font-medium text-foreground truncate">{issue.title}</h4>
                       {issue.commit && (
-                        <div className="text-[10px] text-muted-foreground font-mono">
-                          v: {issue.commit.id.slice(0, 7)}
+                        <div className="text-[10px] text-muted-foreground font-mono flex items-center gap-1 mt-1">
+                          <span>v:</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (issue.commit) {
+                                setSelectedIssueId(issue.id);
+                                handleSelectCommit(issue.commit.id);
+                                setActiveTab("document");
+                              }
+                            }}
+                            className="underline text-accent hover:text-accent/80 font-semibold cursor-pointer"
+                            title="Jump to this version in the document panel"
+                          >
+                            {issue.commit.id.slice(0, 7)}
+                          </button>
                         </div>
                       )}
                     </button>
@@ -857,8 +870,20 @@ function ContractEditor({ contractId }: { contractId: string }) {
                         Started by {creatorEmail} &middot; {new Date(activeIssue.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                       {activeIssue.commit && (
-                        <p className="text-[10px] text-muted-foreground font-mono mt-1">
-                          Associated with version: <span className="underline">{activeIssue.commit.id.slice(0, 7)}</span>
+                        <p className="text-[10px] text-muted-foreground font-mono mt-1 flex items-center gap-1.5">
+                          <span>Associated with version:</span>
+                          <button
+                            onClick={() => {
+                              if (activeIssue.commit) {
+                                handleSelectCommit(activeIssue.commit.id);
+                                setActiveTab("document");
+                              }
+                            }}
+                            className="underline text-accent hover:text-accent/80 font-semibold cursor-pointer"
+                            title="Jump to this version in the document panel"
+                          >
+                            {activeIssue.commit.id.slice(0, 7)}
+                          </button>
                         </p>
                       )}
                     </div>
@@ -1120,7 +1145,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       {copied ? "Copied" : "Copy"}
                     </button>
                   )}
-                  {isViewingHistory ? (
+                  {!displayContent.trim() ? (
+                    <div className="text-sm text-muted-foreground italic py-8 text-center">
+                      Empty document
+                    </div>
+                  ) : (
                     <DiffViewer
                       key={`${headCommit?.id}-${activeCommit?.id}`}
                       myContent={headCommit?.content ?? ""}
@@ -1130,8 +1159,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       commitId={activeCommit?.id}
                       issues={contract?.issues ?? []}
                     />
-                  ) : (
-                    <MarkdownView content={displayContent} />
                   )}
                 </div>
 
