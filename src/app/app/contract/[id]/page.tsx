@@ -84,6 +84,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [replyContents, setReplyContents] = useState<{ [issueId: string]: string }>({});
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [typingIssues, setTypingIssues] = useState<{ [issueId: string]: boolean }>({});
+  const [compareMode, setCompareMode] = useState(false);
+
+  useEffect(() => {
+    setCompareMode(false);
+  }, [viewingCommitId]);
 
   async function triggerTractReply(issueId: string, issueTitle: string, currentComment: string, existingComments: any[] = []) {
     setTypingIssues(prev => ({ ...prev, [issueId]: true }));
@@ -1213,7 +1218,17 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     {activeCommit?.message && (
                       <p className="text-xs text-muted-foreground italic">{activeCommit.message}</p>
                     )}
-                     <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2 flex-wrap">
+                      {isViewingHistory && (
+                        <Button
+                          variant={compareMode ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => setCompareMode(!compareMode)}
+                        >
+                          {compareMode ? "View document" : "Compare to my version"}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -1265,7 +1280,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     <div className="text-sm text-muted-foreground italic py-8 text-center">
                       Empty document
                     </div>
-                  ) : isViewingHistory ? (
+                  ) : (isViewingHistory && compareMode) ? (
                     <DiffViewer
                       key={`${headCommit?.id}-${activeCommit?.id}`}
                       myContent={headCommit?.content ?? ""}
