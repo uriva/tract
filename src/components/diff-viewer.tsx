@@ -508,7 +508,7 @@ function DiffLine({
 
       {/* Inline Comments Section */}
       {showCommentsSection && (
-        <div className="bg-muted/30 border-l-4 border-accent/40 pl-8 pr-4 py-2 space-y-3 text-xs">
+        <div className="bg-muted/30 border-l-4 border-accent/40 pl-8 pr-4 py-2 space-y-3 text-xs font-sans">
           {/* Thread list */}
           {lineIssues.map((issue) => {
             const comments = [...(issue.comments ?? [])].sort((a: any, b: any) => a.createdAt - b.createdAt);
@@ -529,7 +529,7 @@ function DiffLine({
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {onToggleIssueStatus && user && (
+                    {onToggleIssueStatus && (
                       <Button
                         size="sm"
                         variant="ghost"
