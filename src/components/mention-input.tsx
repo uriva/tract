@@ -124,6 +124,7 @@ export function MentionInput({
       <Input
         ref={inputRef}
         type="text"
+        dir="auto"
         value={value}
         onChange={handleTextChange}
         onSelect={handleSelectChange}
@@ -276,6 +277,7 @@ export function MentionTextarea({
     <div ref={containerRef} className="relative w-full">
       <Textarea
         ref={textareaRef}
+        dir="auto"
         value={value}
         onChange={handleTextChange}
         onSelect={handleSelectChange}

@@ -821,7 +821,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                           {new Date(issue.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
                         </span>
                       </div>
-                      <h4 className="font-medium text-foreground truncate">{issue.title}</h4>
+                      <h4 className="font-medium text-foreground truncate" dir="auto">{issue.title}</h4>
                       {issue.commit && (
                         <div className="text-[10px] text-muted-foreground font-mono flex items-center gap-1 mt-1">
                           <span>v:</span>
@@ -920,7 +920,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                         }`}>
                           {isClosed ? "Closed" : "Active"}
                         </span>
-                        <h2 className="text-base font-semibold">{activeIssue.title}</h2>
+                        <h2 className="text-base font-semibold" dir="auto">{activeIssue.title}</h2>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Started by {creatorEmail} &middot; {new Date(activeIssue.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
@@ -993,7 +993,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                               <span>&middot;</span>
                               <span>{getTimeAgo(comment.createdAt)}</span>
                             </div>
-                            <p className="text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
+                            <p className="text-foreground/90 whitespace-pre-wrap" dir="auto">{comment.content}</p>
                           </div>
                         );
                       })
@@ -1255,6 +1255,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       contractId={contractId}
                       commitId={activeCommit?.id}
                       issues={contract?.issues ?? []}
+                      onToggleIssueStatus={handleToggleIssueStatus}
                     />
                   ) : (
                     <MarkdownView

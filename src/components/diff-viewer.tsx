@@ -27,31 +27,32 @@ function getLineIssues(diff: LineDiff, issues: any[], commitId?: string) {
   return issues.filter((issue) => {
     if (issue.lineNumber === undefined) return false;
 
-    // 1. Strict match on lineNumber and lineType (always safe and backward compatible)
+    // If the issue is linked to a commit, only render it on the side it belongs to
+    if (issue.commit?.id) {
+      const isTheirCommit = commitId && issue.commit.id === commitId;
+
+      if (isTheirCommit) {
+        // This issue belongs to theirContent (the right side / Nizzan's version).
+        // So we only render it on lines that are part of theirContent ("added" or "unchanged").
+        const isTheirLine = diff.type === "added" || diff.type === "unchanged";
+        if (isTheirLine && diff.lineNumber === issue.lineNumber) {
+          return true;
+        }
+      } else {
+        // This issue belongs to myContent (the left side / our own version).
+        // So we only render it on lines that are part of myContent ("removed" or "unchanged").
+        const isMyLine = diff.type === "removed" || diff.type === "unchanged";
+        const myLineNumber = diff.type === "removed" ? diff.lineNumber : diff.originalLineNumber;
+        if (isMyLine && myLineNumber === issue.lineNumber) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // Fallback for legacy issues with no commit ID (strict match on line number and type)
     if (issue.lineNumber === diff.lineNumber && issue.lineType === diff.type) {
       return true;
-    }
-
-    // 2. If the issue is associated with the viewed/target commit (theirContent / Nizzan's version)
-    if (commitId && issue.commit?.id === commitId) {
-      // In this diff, lines from theirContent are either "added" or "unchanged",
-      // and their line number in theirContent is diff.lineNumber
-      const isTheirLine = diff.type === "added" || diff.type === "unchanged";
-      if (isTheirLine && diff.lineNumber === issue.lineNumber) {
-        return true;
-      }
-    }
-
-    // 3. If the issue is associated with the base commit (myContent / our own head version)
-    // or has no commit link, we map it to myContent's lines
-    if (!commitId || (issue.commit?.id && issue.commit.id !== commitId)) {
-      // In this diff, lines from myContent are either "removed" or "unchanged",
-      // and their line number in myContent is diff.type === "removed" ? diff.lineNumber : diff.originalLineNumber
-      const isMyLine = diff.type === "removed" || diff.type === "unchanged";
-      const myLineNumber = diff.type === "removed" ? diff.lineNumber : diff.originalLineNumber;
-      if (isMyLine && myLineNumber === issue.lineNumber) {
-        return true;
-      }
     }
 
     return false;
@@ -553,7 +554,7 @@ function DiffLine({
                           <span>&middot;</span>
                           <span>{getTimeAgo(comment.createdAt)}</span>
                         </div>
-                        <p className="text-foreground/90 whitespace-pre-wrap pl-1">{comment.content}</p>
+                        <p className="text-foreground/90 whitespace-pre-wrap pl-1" dir="auto">{comment.content}</p>
                       </div>
                     );
                   })}

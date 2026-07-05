@@ -183,7 +183,7 @@ export function ProseBlock({
                           <span>&middot;</span>
                           <span>{getTimeAgo(comment.createdAt)}</span>
                         </div>
-                        <p className="text-foreground/90 whitespace-pre-wrap pl-1">{comment.content}</p>
+                        <p className="text-foreground/90 whitespace-pre-wrap pl-1" dir="auto">{comment.content}</p>
                       </div>
                     );
                   })}

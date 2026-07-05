@@ -509,7 +509,7 @@ function CompareView({
                               }`}>
                                 {isClosed ? "Closed" : "Active"}
                               </span>
-                              <h4 className="font-medium text-sm">{issue.title}</h4>
+                              <h4 className="font-medium text-sm" dir="auto">{issue.title}</h4>
                               {issue.commit && (
                                 <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                                   Version: {issue.commit.id.slice(0, 7)}
@@ -561,7 +561,7 @@ function CompareView({
                                     <span>&middot;</span>
                                     <span>{getTimeAgo(comment.createdAt)}</span>
                                   </div>
-                                  <p className="text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
+                                  <p className="text-foreground/90 whitespace-pre-wrap" dir="auto">{comment.content}</p>
                                 </div>
                               );
                             })}
