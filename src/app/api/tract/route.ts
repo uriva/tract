@@ -17,16 +17,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
   }
 
-  const systemPrompt = `You are Tract, an AI assistant that helps negotiate and draft contracts. You are given the current content of a contract (in Markdown) and a request from a participant. Your job is to return the updated contract content.
+  const systemPrompt = `You are Tract, an AI assistant that helps negotiate and draft contracts.
+You are given the current content of a contract (in Markdown) and a request from a participant.
+Your job is to apply targeted modifications to the contract.
+Instead of copying and returning the entire contract text, you MUST send a PATCH. You do this by specifying precise SEARCH and REPLACE blocks in JSON format.
 
-Rules:
-- Return ONLY the updated markdown content, nothing else
-- Do not wrap in code fences
-- Preserve the overall structure unless asked to change it
-- Make precise, targeted changes based on the request
-- If the contract is empty, draft a reasonable starting point based on the request
-- Be fair and balanced — do not favor any party
-- Use clear, plain language appropriate for contracts`;
+You MUST respond with a JSON object containing the following keys:
+1. "replacements" (array of objects): A list of replacement blocks to apply to the contract. Each object must have:
+   - "search" (string): The exact block of text from the current contract that you want to change. Be precise and include enough surrounding context to ensure a unique match.
+   - "replace" (string): The new text that should replace the search block.
+2. "commitMessage" (string): A short, concise commit message (1-2 sentences) summarizing what changed.`;
 
   const userPrompt = contractName
     ? `Contract: "${contractName}"\n\nCurrent content:\n${content || "(empty)"}\n\nRequest: ${prompt}`
@@ -47,6 +47,7 @@ Rules:
       ],
       generationConfig: {
         temperature: 0.3,
+        responseMimeType: "application/json",
       },
     }),
   });
@@ -61,49 +62,52 @@ Rules:
   }
 
   const data = await res.json();
-  const text =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const responseJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-  // Generate a short commit message by summarizing actual changes
-  const msgRes = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `You are writing a short commit message (1-2 sentences) summarizing the actual changes made to a contract document. Describe WHAT changed in the document, not what was requested.
+  if (!responseJsonText.trim()) {
+    return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
+  }
 
-Previous version:
-${content || "(empty)"}
+  let parsedResponse;
+  try {
+    parsedResponse = JSON.parse(responseJsonText.trim());
+  } catch (parseErr) {
+    console.error("Failed to parse JSON response from Gemini:", responseJsonText);
+    return NextResponse.json({ error: "Invalid JSON response from AI" }, { status: 502 });
+  }
 
-Updated version:
-${text}
+  const { replacements, commitMessage } = parsedResponse;
 
-Write a concise commit message describing what changed. No quotes, no period at the end. Do not start with "Tract:" or any prefix.`,
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.1,
-      },
-    }),
+  // Apply the replacements to the contract content
+  let updatedContractContent = content || "";
+  let success = false;
+
+  if (Array.isArray(replacements) && replacements.length > 0) {
+    for (const item of replacements) {
+      if (item.search && item.replace !== undefined) {
+        const index = updatedContractContent.indexOf(item.search);
+        if (index !== -1) {
+          updatedContractContent =
+            updatedContractContent.slice(0, index) +
+            item.replace +
+            updatedContractContent.slice(index + item.search.length);
+          success = true;
+        } else {
+          console.warn(`Could not find search block to replace: "${item.search}"`);
+        }
+      }
+    }
+  }
+
+  if (!success && (content || "").trim()) {
+    return NextResponse.json(
+      { error: "AI failed to match and apply any search/replace modifications to the contract content" },
+      { status: 502 },
+    );
+  }
+
+  return NextResponse.json({
+    content: updatedContractContent,
+    message: commitMessage || "AI-suggested changes",
   });
-
-  let commitMessage = "";
-  if (msgRes.ok) {
-    const msgData = await msgRes.json();
-    const msg =
-      msgData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-    if (msg) commitMessage = msg;
-  }
-
-  if (!commitMessage) {
-    commitMessage = "AI-suggested changes";
-  }
-
-  return NextResponse.json({ content: text, message: commitMessage });
 }

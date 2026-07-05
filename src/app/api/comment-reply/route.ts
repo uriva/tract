@@ -24,21 +24,57 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "issueId is required" }, { status: 400 });
   }
 
+  // Pre-fetch the issue details from InstantDB to build rich context
+  let issue;
+  try {
+    const issueResult = await adminDb.query({
+      issues: {
+        contract: {},
+        commit: {
+          author: {},
+        },
+        $: { where: { id: issueId } },
+      },
+    });
+    issue = issueResult?.issues?.[0];
+  } catch (err) {
+    console.error("Failed to query issue details:", err);
+  }
+
+  // Extract inline line numbers and snippets to construct comfortable, inline doc context
+  let inlineContext = "";
+  if (issue && issue.lineNumber !== undefined && issue.lineNumber !== null) {
+    const lines = contractContent ? contractContent.split("\n") : [];
+    const lineText = lines[issue.lineNumber - 1];
+    inlineContext = `
+NOTE ON INLINE CONTEXT: This discussion thread is an INLINE comment specifically referencing line ${issue.lineNumber} (type: ${issue.lineType || "unknown"}) of the contract version shown above.
+The original text of line ${issue.lineNumber} is:
+\`\`\`
+${lineText || "(empty)"}
+\`\`\`
+If the user asks you to fix, edit, rewrite, or update, focus your modifications precisely on or around this specific line of the contract.`;
+  }
+
   const systemPrompt = `You are Tract, an AI assistant that helps negotiate and draft contracts.
 You are participating in a discussion thread titled "${issueTitle || "Untitled Issue"}" about the contract "${contractName || "Untitled Contract"}".
 The current content of the contract is (in Markdown):
 ---
 ${contractContent || "(empty)"}
 ---
+${inlineContext}
 
 Your job is to reply to comments in the thread.
-If the user asks you to edit, change, rewrite, fix, or update any part of the contract, you should also perform the requested modification on the contract content.
+If the user asks you to edit, change, rewrite, fix, or update any part of the contract, you should propose precise, targeted changes.
+Instead of copying and returning the entire contract text, you MUST send a PATCH. You do this by specifying precise SEARCH and REPLACE blocks.
 
 You MUST respond with a JSON object containing the following keys:
 1. "reply" (string): Your helpful, polite, and professional reply comment in the thread. Keep it relatively concise (1-2 paragraphs).
 2. "shouldUpdateContract" (boolean): Set this to true if the last comment asks you to make changes, fixes, or edits to the contract content. Otherwise, set it to false.
-3. "updatedContractContent" (string): The full updated contract content in Markdown. Leave empty if shouldUpdateContract is false.
-4. "commitMessage" (string): A short, concise commit message (1-2 sentences) summarizing what changed in the contract. Leave empty if shouldUpdateContract is false.`;
+3. "replacements" (array of objects): A list of replacement blocks to apply to the contract. Each object must have:
+   - "search" (string): The exact block of text from the current contract that you want to change. Be precise and include enough surrounding context to ensure a unique match.
+   - "replace" (string): The new text that should replace the search block.
+   Leave this array empty if shouldUpdateContract is false.
+4. "commitMessage" (string): A short, concise commit message (1-2 sentences) summarizing what changed. Leave empty if shouldUpdateContract is false.`;
 
   // Format comments context
   const commentHistoryStr = (comments || [])
@@ -96,7 +132,7 @@ Your reply (from "Tract") in JSON format:`;
       return NextResponse.json({ error: "Invalid JSON response from AI" }, { status: 502 });
     }
 
-    const { reply, shouldUpdateContract, updatedContractContent, commitMessage } = parsedResponse;
+    const { reply, shouldUpdateContract, replacements, commitMessage } = parsedResponse;
     const replyText = reply || "";
 
     if (!replyText.trim()) {
@@ -113,72 +149,81 @@ Your reply (from "Tract") in JSON format:`;
         .link({ issue: issueId }),
     ];
 
-    if (shouldUpdateContract && updatedContractContent?.trim()) {
-      // Query database to inspect the issue and its associated contract and commit
-      const issueResult = await adminDb.query({
-        issues: {
-          contract: {},
-          commit: {
-            author: {},
-          },
-          $: { where: { id: issueId } },
-        },
-      });
-
-      const issue = issueResult?.issues?.[0];
+    if (shouldUpdateContract && Array.isArray(replacements) && replacements.length > 0) {
       if (issue) {
         const contractId = issue.contract?.id;
         const currentCommit = issue.commit;
 
         if (contractId) {
-          // Check if currentCommit exists and has no author (which means it's a Tract commit)
-          const isTractCommit = currentCommit && (!currentCommit.author || !currentCommit.author.id);
+          // Construct the updated contract content by applying search/replace blocks as a patch
+          let updatedContractContent = contractContent || "";
+          let success = false;
 
-          if (isTractCommit) {
-            // Squash: Overwrite the existing Tract commit with the new content and update its message
-            transactions.push(
-              adminDb.tx.commits[currentCommit.id].update({
-                content: updatedContractContent.trim(),
-                message: commitMessage || "AI-suggested changes (updated)",
-                createdAt: Date.now(),
-              })
-            );
-            console.log(`Squashing/Updating existing Tract commit: ${currentCommit.id}`);
-          } else {
-            // Create a brand new followup commit and link it as the child of the current commit
-            const newCommitId = genId();
-            transactions.push(
-              adminDb.tx.commits[newCommitId]
-                .update({
-                  content: updatedContractContent.trim(),
-                  message: commitMessage || "AI-suggested changes",
-                  createdAt: Date.now(),
-                })
-                .link({ contract: contractId }),
-            );
-
-            if (currentCommit) {
-              transactions[transactions.length - 1] = transactions[transactions.length - 1].link({ parent: currentCommit.id });
-            } else {
-              // Fallback: if no commit is linked to the issue, find the latest contract commit as parent
-              const contractResult = await adminDb.query({
-                contracts: {
-                  commits: {},
-                  $: { where: { id: contractId } },
-                },
-              });
-              const commits = contractResult?.contracts?.[0]?.commits ?? [];
-              if (commits.length > 0) {
-                commits.sort((a: any, b: any) => b.createdAt - a.createdAt);
-                transactions[transactions.length - 1] = transactions[transactions.length - 1].link({ parent: commits[0].id });
+          for (const item of replacements) {
+            if (item.search && item.replace !== undefined) {
+              const index = updatedContractContent.indexOf(item.search);
+              if (index !== -1) {
+                updatedContractContent =
+                  updatedContractContent.slice(0, index) +
+                  item.replace +
+                  updatedContractContent.slice(index + item.search.length);
+                success = true;
+              } else {
+                console.warn(`Could not find search block to replace: "${item.search}"`);
               }
             }
+          }
 
-            // Link the new commit to the issue
-            transactions.push(
-              adminDb.tx.issues[issueId].link({ commit: newCommitId })
-            );
-            console.log(`Created new followup Tract commit: ${newCommitId}`);
+          if (success && updatedContractContent?.trim()) {
+            // Check if currentCommit exists and has no author (which means it's a Tract commit)
+            const isTractCommit = currentCommit && (!currentCommit.author || !currentCommit.author.id);
+
+            if (isTractCommit) {
+              // Squash: Overwrite the existing Tract commit with the new content and update its message
+              transactions.push(
+                adminDb.tx.commits[currentCommit.id].update({
+                  content: updatedContractContent.trim(),
+                  message: commitMessage || "AI-suggested changes (updated)",
+                  createdAt: Date.now(),
+                })
+              );
+              console.log(`Squashing/Updating existing Tract commit: ${currentCommit.id}`);
+            } else {
+              // Create a brand new followup commit and link it as the child of the current commit
+              const newCommitId = genId();
+              transactions.push(
+                adminDb.tx.commits[newCommitId]
+                  .update({
+                    content: updatedContractContent.trim(),
+                    message: commitMessage || "AI-suggested changes",
+                    createdAt: Date.now(),
+                  })
+                  .link({ contract: contractId }),
+              );
+
+              if (currentCommit) {
+                transactions[transactions.length - 1] = transactions[transactions.length - 1].link({ parent: currentCommit.id });
+              } else {
+                // Fallback: if no commit is linked to the issue, find the latest contract commit as parent
+                const contractResult = await adminDb.query({
+                  contracts: {
+                    commits: {},
+                    $: { where: { id: contractId } },
+                  },
+                });
+                const commits = contractResult?.contracts?.[0]?.commits ?? [];
+                if (commits.length > 0) {
+                  commits.sort((a: any, b: any) => b.createdAt - a.createdAt);
+                  transactions[transactions.length - 1] = transactions[transactions.length - 1].link({ parent: commits[0].id });
+                }
+              }
+
+              // Link the new commit to the issue
+              transactions.push(
+                adminDb.tx.issues[issueId].link({ commit: newCommitId })
+              );
+              console.log(`Created new followup Tract commit: ${newCommitId}`);
+            }
           }
         }
       }
