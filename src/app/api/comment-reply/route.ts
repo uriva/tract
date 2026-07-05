@@ -106,24 +106,21 @@ ${inlineContext}
 
 Your job is to reply to comments in the thread.
 If the user asks you to edit, change, rewrite, fix, or update any part of the contract, you should propose precise, targeted changes.
-Instead of copying and returning the entire contract text, you MUST send a PATCH. You do this by specifying precise SEARCH and REPLACE blocks.
+Instead of copying and returning the entire contract text, you MUST propose a follow-up version. You do this by specifying precise SEARCH and REPLACE blocks.
+All your contract edits will be created as a "proposed version" in history, allowing the user to review, compare, and manually accept/merge your changes.
 
 You MUST respond with a JSON object containing the following keys:
 1. "reply" (string): Your helpful, polite, and professional reply comment in the thread. Keep it relatively concise (1-2 paragraphs).
 2. "shouldUpdateContract" (boolean): Set this to true if the last comment asks you to make changes, fixes, or edits to the contract content. Otherwise, set it to false.
-3. "applyStrategy" (string): How should your edit be committed? Choose one:
-   - "direct": Use this if the user's request is simple, straightforward, or they explicitly asked you to apply/commit edits directly to their active/current version.
-   - "proposal": Use this if you are proposing complex/alternative edits, negotiating a point, or feel the user should review the differences before accepting.
-   - "none": If shouldUpdateContract is false.
-4. "baseVersion" (string): Which base version did you apply your patch to? Choose one:
+3. "baseVersion" (string): Which base version did you apply your patch to? Choose one:
    - "requester": If you patched the Requester's Current Version.
    - "thread": If you patched the Thread Version.
    - "none": If shouldUpdateContract is false.
-5. "replacements" (array of objects): A list of replacement blocks to apply to the contract. Each object must have:
+4. "replacements" (array of objects): A list of replacement blocks to apply to the contract. Each object must have:
    - "search" (string): The exact block of text from your chosen base version that you want to change. Be precise and include enough surrounding lines to ensure a unique match.
    - "replace" (string): The new text that should replace the search block.
    Leave empty if shouldUpdateContract is false.
-6. "commitMessage" (string): A short, concise commit message (1-2 sentences) summarizing what changed. Leave empty if shouldUpdateContract is false.`;
+5. "commitMessage" (string): A short, concise commit message (1-2 sentences) summarizing what changed. Leave empty if shouldUpdateContract is false.`;
 
   // Format comments context
   const commentHistoryStr = (comments || [])
@@ -181,7 +178,7 @@ Your reply (from "Tract") in JSON format:`;
       return NextResponse.json({ error: "Invalid JSON response from AI" }, { status: 502 });
     }
 
-    const { reply, shouldUpdateContract, applyStrategy, baseVersion, replacements, commitMessage } = parsedResponse;
+    const { reply, shouldUpdateContract, baseVersion, replacements, commitMessage } = parsedResponse;
     const replyText = reply || "";
 
     if (!replyText.trim()) {
@@ -223,8 +220,8 @@ Your reply (from "Tract") in JSON format:`;
           const currentCommit = issue.commit;
           const isTractCommit = currentCommit && (!currentCommit.author || !currentCommit.author.id);
 
-          // We only squash if the strategy is "proposal" and the active thread commit is a Tract commit
-          if (isTractCommit && applyStrategy === "proposal") {
+          // Squash: we only squash if the active thread commit is a Tract commit
+          if (isTractCommit) {
             targetCommitId = currentCommit.id;
             transactions.push(
               adminDb.tx.commits[targetCommitId].update({
@@ -263,33 +260,18 @@ Your reply (from "Tract") in JSON format:`;
 
             transactions.push(newCommit);
 
-            // If the strategy is "direct" and we have the requester's participant record,
-            // update their head pointer to point directly to the new commit!
-            if (applyStrategy === "direct" && requesterParticipant) {
-              transactions.push(
-                adminDb.tx.participants[requesterParticipant.id].update({
-                  headCommitId: targetCommitId,
-                })
-              );
-              console.log(`Directly committed onto requester participant's version: ${targetCommitId}`);
-            }
-
             // Link the new commit to the issue so the thread points to it
             transactions.push(
               adminDb.tx.issues[issueId].link({ commit: targetCommitId })
             );
-            console.log(`Created new followup Tract commit: ${targetCommitId}`);
+            console.log(`Created new proposed Tract commit: ${targetCommitId}`);
           }
         }
       }
     }
 
     if (targetCommitId) {
-      if (applyStrategy === "direct") {
-        finalReplyText += `\n\n(Committed directly to your active version ${targetCommitId.slice(0, 7)})`;
-      } else {
-        finalReplyText += `\n\n(Done in version ${targetCommitId.slice(0, 7)})`;
-      }
+      finalReplyText += `\n\n(Done in version ${targetCommitId.slice(0, 7)})`;
     }
 
     // Insert the AI-generated reply comment
