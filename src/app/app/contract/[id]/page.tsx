@@ -17,7 +17,6 @@ import { CommitLog } from "@/components/commit-log";
 import { InviteDialog } from "@/components/invite-dialog";
 import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
-import { DiffViewer } from "@/components/diff-viewer";
 import { CommitDetailDialog } from "@/components/commit-detail-dialog";
 import {
   Dialog,
@@ -84,11 +83,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [replyContents, setReplyContents] = useState<{ [issueId: string]: string }>({});
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [typingIssues, setTypingIssues] = useState<{ [issueId: string]: boolean }>({});
-  const [compareMode, setCompareMode] = useState(false);
-
-  useEffect(() => {
-    setCompareMode(false);
-  }, [viewingCommitId]);
 
   async function triggerTractReply(issueId: string, issueTitle: string, currentComment: string, existingComments: any[] = []) {
     setTypingIssues(prev => ({ ...prev, [issueId]: true }));
@@ -1221,12 +1215,12 @@ function ContractEditor({ contractId }: { contractId: string }) {
                      <div className="flex items-center gap-2 flex-wrap">
                       {isViewingHistory && (
                         <Button
-                          variant={compareMode ? "default" : "outline"}
+                          variant="outline"
                           size="sm"
                           className="text-xs"
-                          onClick={() => setCompareMode(!compareMode)}
+                          onClick={() => router.push(`/app/contract/${contractId}/compare/${activeCommitId}`)}
                         >
-                          {compareMode ? "View document" : "Compare to my version"}
+                          Compare to my version
                         </Button>
                       )}
                       <Button
@@ -1280,17 +1274,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     <div className="text-sm text-muted-foreground italic py-8 text-center">
                       Empty document
                     </div>
-                  ) : (isViewingHistory && compareMode) ? (
-                    <DiffViewer
-                      key={`${headCommit?.id}-${activeCommit?.id}`}
-                      myContent={headCommit?.content ?? ""}
-                      theirContent={activeCommit?.content ?? ""}
-                      theirEmail={activeCommit?.author?.email ?? "Tract"}
-                      contractId={contractId}
-                      commitId={activeCommit?.id}
-                      issues={contract?.issues ?? []}
-                      onToggleIssueStatus={handleToggleIssueStatus}
-                    />
                   ) : (
                     <MarkdownView
                       content={displayContent}

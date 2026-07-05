@@ -216,10 +216,17 @@ function CompareView({
   const myParticipant = participants.find(
     (p) => p.user?.id === user?.id
   );
-  const theirParticipant = participants.find((p) => p.id === participantId);
+  const theirParticipantDirect = participants.find((p) => p.id === participantId);
+  const theirHead = commits.find((c) => c.id === participantId) || (theirParticipantDirect ? commits.find((c) => c.id === theirParticipantDirect.headCommitId) : undefined);
+
+  const theirParticipant = theirParticipantDirect || (theirHead ? {
+    id: "commit",
+    email: theirHead.author?.email || "Tract",
+    user: theirHead.author ? { id: theirHead.author.id, email: theirHead.author.email } : undefined,
+    role: "author",
+  } : undefined);
 
   const myHead = commits.find((c) => c.id === myParticipant?.headCommitId);
-  const theirHead = commits.find((c) => c.id === theirParticipant?.headCommitId);
 
   const myTime = myHead?.createdAt ?? 0;
   const theirTime = theirHead?.createdAt ?? 0;
