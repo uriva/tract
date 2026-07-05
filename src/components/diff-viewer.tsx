@@ -19,6 +19,7 @@ interface DiffViewerProps {
   contractId?: string;
   commitId?: string;
   issues?: any[];
+  onToggleIssueStatus?: (issueId: string, currentStatus: string) => Promise<void>;
 }
 
 function getLineIssues(diff: LineDiff, issues: any[], commitId?: string) {
@@ -65,6 +66,7 @@ export function DiffViewer({
   contractId,
   commitId,
   issues = [],
+  onToggleIssueStatus,
 }: DiffViewerProps) {
   const { user } = db.useAuth();
   const [commentReplyContents, setCommentReplyContents] = useState<{ [issueId: string]: string }>({});
@@ -327,6 +329,7 @@ export function DiffViewer({
               onReplyComment={handleReplyInlineComment}
               getTimeAgo={getTimeAgo}
               readOnly={!onApprove}
+              onToggleIssueStatus={onToggleIssueStatus}
             />
           ))}
         </div>
@@ -354,6 +357,7 @@ interface DiffLineProps {
   onReplyComment: (issueId: string, content: string) => Promise<void>;
   getTimeAgo: (timestamp: number) => string;
   readOnly?: boolean;
+  onToggleIssueStatus?: (issueId: string, currentStatus: string) => Promise<void>;
 }
 
 function DiffLine({
@@ -375,6 +379,7 @@ function DiffLine({
   onReplyComment,
   getTimeAgo,
   readOnly = false,
+  onToggleIssueStatus,
 }: DiffLineProps) {
   const isUnchanged = diff.type === "unchanged";
   const isAdded = diff.type === "added";
@@ -496,7 +501,19 @@ function DiffLine({
                       Inline Discussion
                     </span>
                   </div>
-                  <span>{new Date(issue.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
+                  <div className="flex items-center gap-2">
+                    {onToggleIssueStatus && user && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-5 text-[9px] px-1.5 text-muted-foreground hover:text-foreground hover:bg-muted"
+                        onClick={() => onToggleIssueStatus(issue.id, issue.status)}
+                      >
+                        {isClosed ? "Reopen" : "Close"}
+                      </Button>
+                    )}
+                    <span>{new Date(issue.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
+                  </div>
                 </div>
 
                 {/* Comment list */}

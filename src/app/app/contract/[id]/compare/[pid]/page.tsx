@@ -44,19 +44,59 @@ function CompareView({
   const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newCommentContent, setNewCommentContent] = useState("");
   const [replyContents, setReplyContents] = useState<{ [issueId: string]: string }>({});
+  const [typingIssues, setTypingIssues] = useState<{ [issueId: string]: boolean }>({});
+
+  async function triggerTractReply(issueId: string, issueTitle: string, currentComment: string, existingComments: any[] = []) {
+    setTypingIssues(prev => ({ ...prev, [issueId]: true }));
+    try {
+      const fullComments = [
+        ...existingComments.map((c: any) => ({
+          author: c.creator?.email ? displayName(c.creator.email, c.creator.id) : "Tract",
+          content: c.content,
+          createdAt: c.createdAt,
+        })),
+        {
+          author: displayName(user?.email, user?.id),
+          content: currentComment,
+          createdAt: Date.now(),
+        }
+      ];
+
+      const res = await fetch("/api/comment-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issueId,
+          issueTitle,
+          contractName: contract?.name ?? "Untitled Contract",
+          contractContent: theirHead?.content ?? myHead?.content ?? "",
+          comments: fullComments,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to get reply from Tract");
+      }
+    } catch (err) {
+      console.error("Error triggering Tract reply:", err);
+    } finally {
+      setTypingIssues(prev => ({ ...prev, [issueId]: false }));
+    }
+  }
 
   async function handleCreateIssue() {
     if (!user || !newIssueTitle.trim() || !newCommentContent.trim()) return;
 
     const issueId = id();
     const commentId = id();
+    const titleText = newIssueTitle.trim();
+    const contentText = newCommentContent.trim();
 
     const targetCommit = theirHead ?? myHead;
 
     const txs = [
       db.tx.issues[issueId]
         .update({
-          title: newIssueTitle.trim(),
+          title: titleText,
           createdAt: Date.now(),
           status: "open",
         })
@@ -64,7 +104,7 @@ function CompareView({
         .link({ creator: user.id }),
       db.tx.comments[commentId]
         .update({
-          content: newCommentContent.trim(),
+          content: contentText,
           createdAt: Date.now(),
         })
         .link({ issue: issueId })
@@ -74,7 +114,7 @@ function CompareView({
     if (targetCommit) {
       txs[0] = db.tx.issues[issueId]
         .update({
-          title: newIssueTitle.trim(),
+          title: titleText,
           createdAt: Date.now(),
           status: "open",
         })
@@ -86,6 +126,10 @@ function CompareView({
     await db.transact(txs);
     setNewIssueTitle("");
     setNewCommentContent("");
+
+    if (/\B@\s*tract\b/i.test(contentText)) {
+      triggerTractReply(issueId, titleText, contentText, []);
+    }
   }
 
   async function handleReply(issueId: string) {
@@ -105,6 +149,12 @@ function CompareView({
     ]);
 
     setReplyContents({ ...replyContents, [issueId]: "" });
+
+    if (/\B@\s*tract\b/i.test(content)) {
+      const activeIssue = contract?.issues?.find((issue: any) => issue.id === issueId);
+      const previousComments = activeIssue?.comments ?? [];
+      triggerTractReply(issueId, activeIssue?.title ?? "", content, previousComments);
+    }
   }
 
   async function handleToggleIssueStatus(issueId: string, currentStatus: string) {
@@ -369,6 +419,7 @@ function CompareView({
         contractId={contractId}
         commitId={theirHead.id}
         issues={contract?.issues ?? []}
+        onToggleIssueStatus={handleToggleIssueStatus}
       />
 
       {/* Version Discussions / Issues on these versions */}
@@ -424,9 +475,10 @@ function CompareView({
             const contractIssues = contract?.issues ?? [];
             const relevantIssues = contractIssues.filter(
               (issue: any) =>
-                !issue.commit ||
+                (!issue.commit ||
                 issue.commit.id === myHead?.id ||
-                issue.commit.id === theirHead?.id
+                issue.commit.id === theirHead?.id) &&
+                (issue.lineNumber === undefined || issue.lineNumber === null)
             );
             const sortedIssues = [...relevantIssues].sort((a: any, b: any) => b.createdAt - a.createdAt);
 
@@ -479,11 +531,28 @@ function CompareView({
                           {/* Comments Stream (linear comment correspondence) */}
                           <div className="pl-4 border-l border-border/80 space-y-3">
                             {comments.map((comment: any) => {
-                              const commenterEmail = comment.creator?.email ? displayName(comment.creator.email) : "Unknown user";
+                              const isTract = !comment.creator;
+                              const commenterEmail = !isTract
+                                ? (comment.creator?.email ? displayName(comment.creator.email) : "Unknown user")
+                                : "Tract";
                               return (
                                 <div key={comment.id} className="text-xs space-y-1">
-                                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                                    <span className="font-semibold text-foreground">{commenterEmail}</span>
+                                  <div className="flex items-center gap-1.5 text-muted-foreground font-mono">
+                                    {isTract && (
+                                      <span
+                                        className="inline-flex items-center justify-center w-3.5 h-3.5 rounded text-[8px] font-bold shadow-sm"
+                                        style={{
+                                          background:
+                                            "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
+                                          color: "white",
+                                        }}
+                                      >
+                                        T
+                                      </span>
+                                    )}
+                                    <span className={`font-semibold ${isTract ? "text-accent" : "text-foreground"}`}>
+                                      {commenterEmail}
+                                    </span>
                                     <span>&middot;</span>
                                     <span>{getTimeAgo(comment.createdAt)}</span>
                                   </div>
@@ -491,6 +560,22 @@ function CompareView({
                                 </div>
                               );
                             })}
+                            {typingIssues[issueId] && (
+                              <div className="text-xs space-y-1 animate-pulse flex items-center gap-2 text-muted-foreground font-mono">
+                                <span
+                                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded text-[8px] font-bold"
+                                  style={{
+                                    background:
+                                      "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
+                                    color: "white",
+                                  }}
+                                >
+                                  T
+                                </span>
+                                <span className="font-semibold text-accent">Tract</span>
+                                <span>is typing...</span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Quick Reply Form */}

@@ -50,4 +50,9 @@ export default {
       delete: "auth.id in data.ref('creator.id')",
     },
   },
+  $users: {
+    allow: {
+      view: "auth.id != null",
+    },
+  },
 } as const;
