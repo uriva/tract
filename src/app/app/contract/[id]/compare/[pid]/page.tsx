@@ -588,7 +588,41 @@ function CompareView({
                                       </button>
                                     )}
                                   </div>
-                                  <p className="text-foreground/90 whitespace-pre-wrap" dir="auto">{comment.content}</p>
+                                  <div className="text-foreground/90 whitespace-pre-wrap" dir="auto">
+                                    {(() => {
+                                      const match = comment.content.match(/\(Done in version ([a-f0-9\-]+)\)/);
+                                      if (match) {
+                                        const commitId = match[1];
+                                        const before = comment.content.slice(0, match.index);
+                                        const after = comment.content.slice(match.index! + match[0].length);
+                                        return (
+                                          <div className="space-y-2">
+                                            <p>{before.trim()}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-xs h-7 px-2.5 border-accent/40 hover:bg-accent/10 hover:text-accent font-medium flex items-center gap-1.5"
+                                                onClick={() => router.push(`/app/contract/${contractId}/compare/${commitId}`)}
+                                              >
+                                                <span>Compare & Merge</span>
+                                              </Button>
+                                              <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="text-xs h-7 px-2.5 flex items-center gap-1.5"
+                                                onClick={() => router.push(`/app/contract/${contractId}`)}
+                                              >
+                                                <span>Back to contract</span>
+                                              </Button>
+                                            </div>
+                                            {after && <p className="mt-1">{after.trim()}</p>}
+                                          </div>
+                                        );
+                                      }
+                                      return comment.content;
+                                    })()}
+                                  </div>
                                 </div>
                               );
                             })}
