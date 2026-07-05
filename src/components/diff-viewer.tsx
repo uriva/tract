@@ -124,6 +124,7 @@ export function DiffViewer({
           contractContent: theirContent || myContent || "",
           comments: fullComments,
           viewingCommitId: commitId,
+          userId: user?.id,
         }),
       });
       if (!res.ok) {

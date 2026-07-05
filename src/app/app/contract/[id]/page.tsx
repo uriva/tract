@@ -100,7 +100,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         }
       ];
 
-      const res = await fetch("/api/comment-reply", {
+       const res = await fetch("/api/comment-reply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -110,6 +110,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
           contractContent: activeCommit?.content ?? "",
           comments: fullComments,
           viewingCommitId: activeCommitId,
+          userId: user?.id,
         }),
       });
       if (!res.ok) {

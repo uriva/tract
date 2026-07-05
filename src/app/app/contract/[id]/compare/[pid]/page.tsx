@@ -73,6 +73,7 @@ function CompareView({
           contractContent: theirHead?.content ?? myHead?.content ?? "",
           comments: fullComments,
           viewingCommitId: theirHead?.id ?? myHead?.id,
+          userId: user?.id,
         }),
       });
       if (!res.ok) {
