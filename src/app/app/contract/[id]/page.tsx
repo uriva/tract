@@ -110,6 +110,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
           contractName: contract?.name ?? "Untitled Contract",
           contractContent: activeCommit?.content ?? "",
           comments: fullComments,
+          viewingCommitId: activeCommitId,
         }),
       });
       if (!res.ok) {

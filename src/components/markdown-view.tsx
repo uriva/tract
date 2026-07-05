@@ -175,11 +175,26 @@ export function ProseBlock({
                 {/* Comment list */}
                 <div className="space-y-2">
                   {comments.map((comment: any) => {
-                    const authorName = comment.creator?.email ? displayName(comment.creator.email) : "Unknown";
+                    const isTract = !comment.creator;
+                    const authorName = !isTract
+                      ? (comment.creator?.email ? displayName(comment.creator.email) : "Unknown user")
+                      : "Tract";
                     return (
                       <div key={comment.id} className="space-y-0.5">
                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                          <span className="font-semibold text-foreground/80">{authorName}</span>
+                          {isTract && (
+                            <span
+                              className="inline-flex items-center justify-center w-3.5 h-3.5 rounded text-[8px] font-bold shadow-sm mr-0.5"
+                              style={{
+                                background:
+                                  "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
+                                color: "white",
+                              }}
+                            >
+                              T
+                            </span>
+                          )}
+                          <span className={`font-semibold ${isTract ? "text-accent" : "text-foreground/80"}`}>{authorName}</span>
                           <span>&middot;</span>
                           <span>{getTimeAgo(comment.createdAt)}</span>
                         </div>

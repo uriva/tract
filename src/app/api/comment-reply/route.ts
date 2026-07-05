@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { issueId, issueTitle, contractName, contractContent, comments } = await req.json();
+  const { issueId, issueTitle, contractName, contractContent, comments, viewingCommitId } = await req.json();
 
   if (!issueId) {
     return NextResponse.json({ error: "issueId is required" }, { status: 400 });
@@ -196,8 +196,9 @@ Your reply (from "Tract") in JSON format:`;
                 })
                 .link({ contract: contractId });
 
-              if (currentCommit) {
-                newCommit = newCommit.link({ parent: currentCommit.id });
+              const parentCommitId = viewingCommitId || currentCommit?.id;
+              if (parentCommitId) {
+                newCommit = newCommit.link({ parent: parentCommitId });
               } else {
                 // Fallback: if no commit is linked to the issue, find the latest contract commit as parent
                 const contractResult = await adminDb.query({

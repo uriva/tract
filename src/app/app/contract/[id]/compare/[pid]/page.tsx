@@ -72,6 +72,7 @@ function CompareView({
           contractName: contract?.name ?? "Untitled Contract",
           contractContent: theirHead?.content ?? myHead?.content ?? "",
           comments: fullComments,
+          viewingCommitId: theirHead?.id ?? myHead?.id,
         }),
       });
       if (!res.ok) {
