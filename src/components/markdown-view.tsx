@@ -109,6 +109,13 @@ export function ProseBlock({
     setCommentReplyContents({ ...commentReplyContents, [issueId]: "" });
   }
 
+  async function handleDeleteComment(commentId: string) {
+    if (!confirm("Are you sure you want to delete this comment?")) return;
+    await db.transact([
+      db.tx.comments[commentId].delete()
+    ]);
+  }
+
   function getTimeAgo(timestamp: number): string {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
     if (seconds < 60) return "just now";
@@ -180,23 +187,34 @@ export function ProseBlock({
                       ? (comment.creator?.email ? displayName(comment.creator.email) : "Unknown user")
                       : "Tract";
                     return (
-                      <div key={comment.id} className="space-y-0.5">
-                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                          {isTract && (
-                            <span
-                              className="inline-flex items-center justify-center w-3.5 h-3.5 rounded text-[8px] font-bold shadow-sm mr-0.5"
-                              style={{
-                                background:
-                                  "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
-                                color: "white",
-                              }}
+                      <div key={comment.id} className="group/comment space-y-0.5">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                          <div className="flex items-center gap-1 text-[10px]">
+                            {isTract && (
+                              <span
+                                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded text-[8px] font-bold shadow-sm mr-0.5"
+                                style={{
+                                  background:
+                                    "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
+                                  color: "white",
+                                }}
+                              >
+                                T
+                              </span>
+                            )}
+                            <span className={`font-semibold ${isTract ? "text-accent" : "text-foreground/80"}`}>{authorName}</span>
+                            <span>&middot;</span>
+                            <span>{getTimeAgo(comment.createdAt)}</span>
+                          </div>
+                          {comment.creator?.id === user?.id && (
+                            <button
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="opacity-0 group-hover/comment:opacity-100 transition-opacity text-[9px] text-muted-foreground hover:text-destructive cursor-pointer"
+                              title="Delete comment"
                             >
-                              T
-                            </span>
+                              delete
+                            </button>
                           )}
-                          <span className={`font-semibold ${isTract ? "text-accent" : "text-foreground/80"}`}>{authorName}</span>
-                          <span>&middot;</span>
-                          <span>{getTimeAgo(comment.createdAt)}</span>
                         </div>
                         <p className="text-foreground/90 whitespace-pre-wrap pl-1" dir="auto">{comment.content}</p>
                       </div>

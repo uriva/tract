@@ -205,6 +205,13 @@ function ContractEditor({ contractId }: { contractId: string }) {
     ]);
   }
 
+  async function handleDeleteComment(commentId: string) {
+    if (!confirm("Are you sure you want to delete this comment?")) return;
+    await db.transact([
+      db.tx.comments[commentId].delete()
+    ]);
+  }
+
   function getTimeAgo(timestamp: number): string {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
     if (seconds < 60) return "just now";
@@ -969,30 +976,41 @@ function ContractEditor({ contractId }: { contractId: string }) {
                         return (
                           <div
                             key={comment.id}
-                            className={`text-xs space-y-1 p-3 rounded-lg border transition-colors ${
+                            className={`group/comment text-xs space-y-1 p-3 rounded-lg border transition-colors ${
                               isTract
                                 ? "bg-accent/5 border-accent/20 dark:bg-accent/5"
                                 : "bg-muted/40 border-border/50"
                             }`}
                           >
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              {isTract && (
-                                <span
-                                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded text-[8px] font-bold shadow-sm"
-                                  style={{
-                                    background:
-                                      "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
-                                    color: "white",
-                                  }}
-                                >
-                                  T
+                            <div className="flex items-center justify-between text-muted-foreground">
+                              <div className="flex items-center gap-2">
+                                {isTract && (
+                                  <span
+                                    className="inline-flex items-center justify-center w-3.5 h-3.5 rounded text-[8px] font-bold shadow-sm"
+                                    style={{
+                                      background:
+                                        "linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent) 60%, #6d9eeb))",
+                                      color: "white",
+                                    }}
+                                  >
+                                    T
+                                  </span>
+                                )}
+                                <span className={`font-semibold ${isTract ? "text-accent" : "text-foreground"}`}>
+                                  {commenterEmail}
                                 </span>
+                                <span>&middot;</span>
+                                <span>{getTimeAgo(comment.createdAt)}</span>
+                              </div>
+                              {comment.creator?.id === user?.id && (
+                                <button
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                  className="opacity-0 group-hover/comment:opacity-100 transition-opacity text-[10px] text-muted-foreground hover:text-destructive cursor-pointer"
+                                  title="Delete comment"
+                                >
+                                  delete
+                                </button>
                               )}
-                              <span className={`font-semibold ${isTract ? "text-accent" : "text-foreground"}`}>
-                                {commenterEmail}
-                              </span>
-                              <span>&middot;</span>
-                              <span>{getTimeAgo(comment.createdAt)}</span>
                             </div>
                             <p className="text-foreground/90 whitespace-pre-wrap" dir="auto">{comment.content}</p>
                           </div>

@@ -134,7 +134,7 @@ export function MentionInput({
         {...props}
       />
       {showDropdown && filteredSuggestions.length > 0 && (
-        <div className="absolute left-0 right-0 z-50 mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md text-xs">
+        <div className="absolute left-0 right-0 bottom-full z-50 mb-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md text-xs">
           {filteredSuggestions.map((suggestion, idx) => {
             const isTract = suggestion.toLowerCase() === "tract";
             const isSelected = idx === selectedIndex;
@@ -287,7 +287,7 @@ export function MentionTextarea({
         {...props}
       />
       {showDropdown && filteredSuggestions.length > 0 && (
-        <div className="absolute left-0 right-0 z-50 mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md text-xs">
+        <div className="absolute left-0 right-0 bottom-full z-50 mb-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md text-xs">
           {filteredSuggestions.map((suggestion, idx) => {
             const isTract = suggestion.toLowerCase() === "tract";
             const isSelected = idx === selectedIndex;
