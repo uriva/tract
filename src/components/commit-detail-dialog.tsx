@@ -76,7 +76,7 @@ export function CommitDetailDialog({
               myContent={parentCommit?.content ?? ""}
               theirContent={commit.content}
               theirEmail={commit.author?.email ?? "Tract"}
-              contractId={contractId}
+              contractId={contractId ?? ""}
               commitId={commit.id}
               issues={issues}
             />

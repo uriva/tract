@@ -140,14 +140,10 @@ Your reply (from "Tract") in JSON format:`;
     }
 
     const replyCommentId = genId();
-    const transactions: any[] = [
-      adminDb.tx.comments[replyCommentId]
-        .update({
-          content: replyText.trim(),
-          createdAt: Date.now(),
-        })
-        .link({ issue: issueId }),
-    ];
+    let finalReplyText = replyText.trim();
+    let targetCommitId = "";
+
+    const transactions: any[] = [];
 
     if (shouldUpdateContract && Array.isArray(replacements) && replacements.length > 0) {
       if (issue) {
@@ -179,30 +175,29 @@ Your reply (from "Tract") in JSON format:`;
             const isTractCommit = currentCommit && (!currentCommit.author || !currentCommit.author.id);
 
             if (isTractCommit) {
+              targetCommitId = currentCommit.id;
               // Squash: Overwrite the existing Tract commit with the new content and update its message
               transactions.push(
-                adminDb.tx.commits[currentCommit.id].update({
+                adminDb.tx.commits[targetCommitId].update({
                   content: updatedContractContent.trim(),
                   message: commitMessage || "AI-suggested changes (updated)",
                   createdAt: Date.now(),
                 })
               );
-              console.log(`Squashing/Updating existing Tract commit: ${currentCommit.id}`);
+              console.log(`Squashing/Updating existing Tract commit: ${targetCommitId}`);
             } else {
+              targetCommitId = genId();
               // Create a brand new followup commit and link it as the child of the current commit
-              const newCommitId = genId();
-              transactions.push(
-                adminDb.tx.commits[newCommitId]
-                  .update({
-                    content: updatedContractContent.trim(),
-                    message: commitMessage || "AI-suggested changes",
-                    createdAt: Date.now(),
-                  })
-                  .link({ contract: contractId }),
-              );
+              let newCommit = adminDb.tx.commits[targetCommitId]
+                .update({
+                  content: updatedContractContent.trim(),
+                  message: commitMessage || "AI-suggested changes",
+                  createdAt: Date.now(),
+                })
+                .link({ contract: contractId });
 
               if (currentCommit) {
-                transactions[transactions.length - 1] = transactions[transactions.length - 1].link({ parent: currentCommit.id });
+                newCommit = newCommit.link({ parent: currentCommit.id });
               } else {
                 // Fallback: if no commit is linked to the issue, find the latest contract commit as parent
                 const contractResult = await adminDb.query({
@@ -214,20 +209,36 @@ Your reply (from "Tract") in JSON format:`;
                 const commits = contractResult?.contracts?.[0]?.commits ?? [];
                 if (commits.length > 0) {
                   commits.sort((a: any, b: any) => b.createdAt - a.createdAt);
-                  transactions[transactions.length - 1] = transactions[transactions.length - 1].link({ parent: commits[0].id });
+                  newCommit = newCommit.link({ parent: commits[0].id });
                 }
               }
 
+              transactions.push(newCommit);
+
               // Link the new commit to the issue
               transactions.push(
-                adminDb.tx.issues[issueId].link({ commit: newCommitId })
+                adminDb.tx.issues[issueId].link({ commit: targetCommitId })
               );
-              console.log(`Created new followup Tract commit: ${newCommitId}`);
+              console.log(`Created new followup Tract commit: ${targetCommitId}`);
             }
           }
         }
       }
     }
+
+    if (targetCommitId) {
+      finalReplyText += `\n\n(Done in version ${targetCommitId.slice(0, 7)})`;
+    }
+
+    // Insert the AI-generated reply comment
+    transactions.unshift(
+      adminDb.tx.comments[replyCommentId]
+        .update({
+          content: finalReplyText,
+          createdAt: Date.now(),
+        })
+        .link({ issue: issueId })
+    );
 
     // Execute the transactions in a single atomic batch
     await adminDb.transact(transactions);

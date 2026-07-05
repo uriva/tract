@@ -17,7 +17,7 @@ interface DiffViewerProps {
   theirEmail: string;
   onApprove?: (newContent: string, approvedCount: number, totalCount: number) => void;
   applying?: boolean;
-  contractId?: string;
+  contractId: string;
   commitId?: string;
   issues?: any[];
   onToggleIssueStatus?: (issueId: string, currentStatus: string) => Promise<void>;
@@ -71,14 +71,14 @@ export function DiffViewer({
   onToggleIssueStatus,
 }: DiffViewerProps) {
   const { user } = db.useAuth();
-  const { data: contractData } = db.useQuery(contractId ? {
+  const { data: contractData } = db.useQuery({
     contracts: {
       participants: {
         user: {}
       },
       $: { where: { id: contractId } }
     }
-  } : null);
+  });
   const participants = contractData?.contracts?.[0]?.participants ?? [];
   const mentionSuggestions = useMemo(() => {
     const list = ["tract"];
@@ -96,6 +96,44 @@ export function DiffViewer({
   const [commentReplyContents, setCommentReplyContents] = useState<{ [issueId: string]: string }>({});
   const [activeCommentLine, setActiveCommentLine] = useState<{ lineNumber: number; lineType: string } | null>(null);
   const [newCommentInput, setNewCommentInput] = useState("");
+  const [typingIssues, setTypingIssues] = useState<{ [issueId: string]: boolean }>({});
+
+  async function triggerTractReply(issueId: string, issueTitle: string, currentComment: string, existingComments: any[] = []) {
+    setTypingIssues(prev => ({ ...prev, [issueId]: true }));
+    try {
+      const fullComments = [
+        ...existingComments.map((c: any) => ({
+          author: c.creator?.email ? displayName(c.creator.email) : "Tract",
+          content: c.content,
+          createdAt: c.createdAt,
+        })),
+        {
+          author: displayName(user?.email, user?.id),
+          content: currentComment,
+          createdAt: Date.now(),
+        }
+      ];
+
+      const res = await fetch("/api/comment-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issueId,
+          issueTitle,
+          contractName: contractData?.contracts?.[0]?.name ?? "Untitled Contract",
+          contractContent: theirContent || myContent || "",
+          comments: fullComments,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to get reply from Tract");
+      }
+    } catch (err) {
+      console.error("Error triggering Tract reply:", err);
+    } finally {
+      setTypingIssues(prev => ({ ...prev, [issueId]: false }));
+    }
+  }
 
   async function handleCreateInlineComment(lineNumber: number, lineType: string, content: string) {
     if (!user || !contractId || !content.trim()) return;
@@ -140,6 +178,10 @@ export function DiffViewer({
     await db.transact(txs);
     setNewCommentInput("");
     setActiveCommentLine(null);
+
+    if (/\B@\s*tract\b/i.test(content)) {
+      triggerTractReply(issueId, `Line ${lineNumber} (${lineType}) Discussion`, content, []);
+    }
   }
 
   async function handleReplyInlineComment(issueId: string, content: string) {
@@ -157,6 +199,12 @@ export function DiffViewer({
     ]);
 
     setCommentReplyContents({ ...commentReplyContents, [issueId]: "" });
+
+    if (/\B@\s*tract\b/i.test(content)) {
+      const activeIssue = issues.find((issue: any) => issue.id === issueId);
+      const previousComments = activeIssue?.comments ?? [];
+      triggerTractReply(issueId, activeIssue?.title ?? "Inline Discussion", content, previousComments);
+    }
   }
 
   function getTimeAgo(timestamp: number): string {
@@ -355,6 +403,7 @@ export function DiffViewer({
               readOnly={!onApprove}
               onToggleIssueStatus={onToggleIssueStatus}
               mentionSuggestions={mentionSuggestions}
+              typingIssues={typingIssues}
             />
           ))}
         </div>
@@ -384,6 +433,7 @@ interface DiffLineProps {
   readOnly?: boolean;
   onToggleIssueStatus?: (issueId: string, currentStatus: string) => Promise<void>;
   mentionSuggestions: string[];
+  typingIssues: { [issueId: string]: boolean };
 }
 
 function DiffLine({
@@ -407,6 +457,7 @@ function DiffLine({
   readOnly = false,
   onToggleIssueStatus,
   mentionSuggestions,
+  typingIssues,
 }: DiffLineProps) {
   const isUnchanged = diff.type === "unchanged";
   const isAdded = diff.type === "added";
@@ -558,6 +609,15 @@ function DiffLine({
                       </div>
                     );
                   })}
+                  {typingIssues[issue.id] && (
+                    <div className="text-[10px] space-y-1 animate-pulse flex items-center gap-1.5 text-muted-foreground font-sans pt-1 border-t border-border/10">
+                      <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded bg-gradient-to-br from-accent to-[#6d9eeb] text-[8px] font-bold text-white shadow-sm shrink-0">
+                        T
+                      </span>
+                      <span className="font-semibold text-accent">Tract</span>
+                      <span>is typing...</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Reply Form */}
