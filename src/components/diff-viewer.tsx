@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { computeLineDiffs, applySelectedChanges, pairWordDiffs, LineDiff, type WordSegment } from "@/lib/diff";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MentionInput, MentionTextarea } from "@/components/mention-input";
@@ -97,6 +98,9 @@ export function DiffViewer({
   const [activeCommentLine, setActiveCommentLine] = useState<{ lineNumber: number; lineType: string } | null>(null);
   const [newCommentInput, setNewCommentInput] = useState("");
   const [typingIssues, setTypingIssues] = useState<{ [issueId: string]: boolean }>({});
+  const [manualText, setManualText] = useState("");
+  const [isEditingManually, setIsEditingManually] = useState(false);
+  const [copiedMerged, setCopiedMerged] = useState(false);
 
   async function triggerTractReply(issueId: string, issueTitle: string, currentComment: string, existingComments: any[] = []) {
     setTypingIssues(prev => ({ ...prev, [issueId]: true }));
@@ -324,9 +328,11 @@ export function DiffViewer({
     setApproved(new Set());
   }
 
+  const previewContent = useMemo(() => applySelectedChanges(myContent, theirContent, approved), [myContent, theirContent, approved]);
+
   function handleApply() {
     if (!onApprove) return;
-    const newContent = applySelectedChanges(myContent, theirContent, approved);
+    const newContent = isEditingManually ? manualText : previewContent;
     onApprove(newContent, approvedHunkCount, totalHunkCount);
   }
 
@@ -369,10 +375,12 @@ export function DiffViewer({
           <Button
             size="sm"
             onClick={handleApply}
-            disabled={approvedHunkCount === 0 || applying}
+            disabled={(!isEditingManually && approvedHunkCount === 0) || applying}
           >
             {applying
               ? "Applying..."
+              : isEditingManually
+              ? "Apply manual merge"
               : `Apply ${approvedHunkCount} change${approvedHunkCount !== 1 ? "s" : ""}`}
           </Button>
         </div>
@@ -418,6 +426,78 @@ export function DiffViewer({
           ))}
         </div>
       </div>
+
+      {/* Merged Preview and Manual Merge Option */}
+      {onApprove && (
+        <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3 mt-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Merged Output Preview</span>
+              <Badge variant="outline" className="text-[10px] h-5 py-0">
+                {isEditingManually ? "Manual edits enabled" : "Auto-computed"}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-[11px] h-7 px-2.5"
+                onClick={() => {
+                  navigator.clipboard.writeText(isEditingManually ? manualText : previewContent);
+                  setCopiedMerged(true);
+                  setTimeout(() => setCopiedMerged(false), 2000);
+                }}
+              >
+                {copiedMerged ? "Copied!" : "Copy to clipboard"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[11px] h-7 text-accent hover:bg-accent/10"
+                onClick={() => {
+                  if (isEditingManually) {
+                    setIsEditingManually(false);
+                  } else {
+                    setManualText(previewContent);
+                    setIsEditingManually(true);
+                  }
+                }}
+              >
+                {isEditingManually ? "Reset to checkboxes" : "Edit manually"}
+              </Button>
+            </div>
+          </div>
+
+          <Textarea
+            value={isEditingManually ? manualText : previewContent}
+            onChange={(e) => {
+              if (!isEditingManually) {
+                setManualText(previewContent);
+                setIsEditingManually(true);
+              }
+              setManualText(e.target.value);
+            }}
+            placeholder="No changes selected yet. Select some changes above or type here to compose your manual merge."
+            className="font-mono text-xs min-h-[150px] max-h-[400px] bg-background resize-y leading-relaxed"
+          />
+
+          {isEditingManually && (
+            <p className="text-[10px] text-muted-foreground italic">
+              You are editing the merged result manually. Click "Apply manual merge" to save this exact text.
+            </p>
+          )}
+
+          <div className="flex justify-end pt-2 border-t border-border/50">
+            <Button
+              size="sm"
+              onClick={handleApply}
+              disabled={!(isEditingManually ? manualText : previewContent).trim() || applying}
+            >
+              {applying ? "Applying..." : isEditingManually ? "Apply manual merge" : "Apply merged changes"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
