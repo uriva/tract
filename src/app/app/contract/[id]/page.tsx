@@ -388,12 +388,15 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
   // When clicking a commit in history
   function handleSelectCommit(commitId: string) {
-    if (commitId === myHeadCommitId) {
+    const resolvedCommit = commits.find((c: any) => c.id === commitId || c.id.startsWith(commitId));
+    const fullCommitId = resolvedCommit ? resolvedCommit.id : commitId;
+
+    if (fullCommitId === myHeadCommitId) {
       // Going back to HEAD
       setViewingCommitId(null);
       setMode("view");
     } else {
-      setViewingCommitId(commitId);
+      setViewingCommitId(fullCommitId);
       setMode("view"); // Always view when browsing history
     }
   }
@@ -1035,7 +1038,10 @@ function ContractEditor({ contractId }: { contractId: string }) {
                                           variant="secondary"
                                           size="sm"
                                           className="text-xs h-7 px-2.5 flex items-center gap-1.5"
-                                          onClick={() => handleSelectCommit(commitId)}
+                                          onClick={() => {
+                                            handleSelectCommit(commitId);
+                                            setActiveTab("document");
+                                          }}
                                         >
                                           <span>View Version</span>
                                         </Button>

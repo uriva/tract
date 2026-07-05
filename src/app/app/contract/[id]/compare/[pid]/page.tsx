@@ -218,7 +218,7 @@ function CompareView({
     (p) => p.user?.id === user?.id
   );
   const theirParticipantDirect = participants.find((p) => p.id === participantId);
-  const theirHead = commits.find((c) => c.id === participantId) || (theirParticipantDirect ? commits.find((c) => c.id === theirParticipantDirect.headCommitId) : undefined);
+  const theirHead = commits.find((c: any) => c.id === participantId || c.id.startsWith(participantId)) || (theirParticipantDirect ? commits.find((c: any) => c.id === theirParticipantDirect.headCommitId) : undefined);
 
   const theirParticipant = theirParticipantDirect || (theirHead ? {
     id: "commit",
