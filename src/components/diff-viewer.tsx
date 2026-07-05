@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MentionInput, MentionTextarea } from "@/components/mention-input";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { displayName } from "@/lib/utils";
@@ -69,6 +70,28 @@ export function DiffViewer({
   onToggleIssueStatus,
 }: DiffViewerProps) {
   const { user } = db.useAuth();
+  const { data: contractData } = db.useQuery(contractId ? {
+    contracts: {
+      participants: {
+        user: {}
+      },
+      $: { where: { id: contractId } }
+    }
+  } : null);
+  const participants = contractData?.contracts?.[0]?.participants ?? [];
+  const mentionSuggestions = useMemo(() => {
+    const list = ["tract"];
+    participants.forEach((p: any) => {
+      if (p.email) {
+        list.push(p.email.split("@")[0]);
+      }
+    });
+    if (theirEmail) {
+      list.push(theirEmail.split("@")[0]);
+    }
+    return Array.from(new Set(list));
+  }, [participants, theirEmail]);
+
   const [commentReplyContents, setCommentReplyContents] = useState<{ [issueId: string]: string }>({});
   const [activeCommentLine, setActiveCommentLine] = useState<{ lineNumber: number; lineType: string } | null>(null);
   const [newCommentInput, setNewCommentInput] = useState("");
@@ -330,6 +353,7 @@ export function DiffViewer({
               getTimeAgo={getTimeAgo}
               readOnly={!onApprove}
               onToggleIssueStatus={onToggleIssueStatus}
+              mentionSuggestions={mentionSuggestions}
             />
           ))}
         </div>
@@ -358,6 +382,7 @@ interface DiffLineProps {
   getTimeAgo: (timestamp: number) => string;
   readOnly?: boolean;
   onToggleIssueStatus?: (issueId: string, currentStatus: string) => Promise<void>;
+  mentionSuggestions: string[];
 }
 
 function DiffLine({
@@ -380,6 +405,7 @@ function DiffLine({
   getTimeAgo,
   readOnly = false,
   onToggleIssueStatus,
+  mentionSuggestions,
 }: DiffLineProps) {
   const isUnchanged = diff.type === "unchanged";
   const isAdded = diff.type === "added";
@@ -536,10 +562,11 @@ function DiffLine({
                 {/* Reply Form */}
                 {!isClosed && user && (
                   <div className="flex items-center gap-2 pt-1.5 border-t border-border/30">
-                    <Input
+                    <MentionInput
                       placeholder="Reply inline..."
                       value={commentReplyContents[replyKey] ?? ""}
-                      onChange={(e) => setCommentReplyContents({ ...commentReplyContents, [replyKey]: e.target.value })}
+                      onChange={(val) => setCommentReplyContents({ ...commentReplyContents, [replyKey]: val })}
+                      suggestions={mentionSuggestions}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && (commentReplyContents[replyKey] ?? "").trim()) {
                           onReplyComment(replyKey, commentReplyContents[replyKey]);
@@ -567,10 +594,11 @@ function DiffLine({
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block">
                 New inline comment on line {diff.lineNumber}
               </span>
-              <Textarea
+              <MentionTextarea
                 placeholder="Write your inline comment/feedback here..."
                 value={newCommentInput}
-                onChange={(e) => setNewCommentInput(e.target.value)}
+                onChange={setNewCommentInput}
+                suggestions={mentionSuggestions}
                 className="min-h-[60px] text-xs"
               />
               <div className="flex justify-end gap-1.5">

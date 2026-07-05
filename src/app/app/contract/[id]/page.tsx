@@ -6,6 +6,7 @@ import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "@/components/mention-input";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -239,6 +240,9 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const commits = contract?.commits ?? [];
   const participants = contract?.participants ?? [];
   const colorMap = useMemo(() => assignParticipantColors(participants), [participants]);
+  const mentionSuggestions = useMemo(() => {
+    return ["tract", ...participants.map((p: any) => p.email ? displayName(p.email) : "").filter(Boolean)];
+  }, [participants]);
 
   const myParticipant = participants.find(
     (p) => p.user?.id === user?.id
@@ -862,10 +866,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
                         onChange={(e) => setNewIssueTitle(e.target.value)}
                         className="text-sm"
                       />
-                      <Textarea
+                      <MentionTextarea
                         placeholder="Write your feedback or comment here..."
                         value={newCommentContent}
-                        onChange={(e) => setNewCommentContent(e.target.value)}
+                        onChange={setNewCommentContent}
+                        suggestions={mentionSuggestions}
                         className="min-h-[120px] text-sm bg-card"
                       />
                       <div className="flex items-center justify-between">
@@ -1014,10 +1019,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
                   {/* Reply Form */}
                   {!isClosed && user && (
                     <div className="space-y-2 pt-3 border-t border-border">
-                      <Textarea
+                      <MentionTextarea
                         placeholder="Type your reply here..."
                         value={replyContents[activeIssue.id] ?? ""}
-                        onChange={(e) => setReplyContents({ ...replyContents, [activeIssue.id]: e.target.value })}
+                        onChange={(val) => setReplyContents({ ...replyContents, [activeIssue.id]: val })}
+                        suggestions={mentionSuggestions}
                         className="min-h-[80px] text-xs"
                       />
                       <div className="flex justify-end">

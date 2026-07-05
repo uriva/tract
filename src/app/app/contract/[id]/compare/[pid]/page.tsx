@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MentionInput, MentionTextarea } from "@/components/mention-input";
 import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
 import { DiffViewer } from "@/components/diff-viewer";
@@ -200,6 +201,9 @@ function CompareView({
   const contract = data?.contracts?.[0];
   const commits = contract?.commits ?? [];
   const participants = contract?.participants ?? [];
+  const mentionSuggestions = useMemo(() => {
+    return ["tract", ...participants.map((p: any) => p.email ? displayName(p.email) : "").filter(Boolean)];
+  }, [participants]);
 
   const myParticipant = participants.find(
     (p) => p.user?.id === user?.id
@@ -441,11 +445,12 @@ function CompareView({
               onChange={(e) => setNewIssueTitle(e.target.value)}
               className="text-sm"
             />
-            <textarea
+             <MentionTextarea
               placeholder="Write your feedback or comment here..."
               value={newCommentContent}
-              onChange={(e) => setNewCommentContent(e.target.value)}
-              className="w-full min-h-[80px] text-sm p-3 rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+              onChange={setNewCommentContent}
+              suggestions={mentionSuggestions}
+              className="w-full min-h-[80px] text-sm p-3 rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring bg-card"
             />
             <div className="flex justify-end gap-2">
               <Button
@@ -581,10 +586,11 @@ function CompareView({
                           {/* Quick Reply Form */}
                           {!isClosed && user && (
                             <div className="flex items-center gap-2 pt-2">
-                              <Input
+                              <MentionInput
                                 placeholder="Reply to this thread..."
                                 value={replyContents[issueId] ?? ""}
-                                onChange={(e) => setReplyContents({ ...replyContents, [issueId]: e.target.value })}
+                                onChange={(val) => setReplyContents({ ...replyContents, [issueId]: val })}
+                                suggestions={mentionSuggestions}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" && (replyContents[issueId] ?? "").trim()) {
                                     handleReply(issueId);
