@@ -264,6 +264,24 @@ Your reply (from "Tract") in JSON format:`;
             transactions.push(
               adminDb.tx.issues[issueId].link({ commit: targetCommitId })
             );
+
+            if (requesterParticipant) {
+              const prId = genId();
+              let prUpdate = adminDb.tx.pullRequests[prId]
+                .update({
+                  status: "open",
+                  createdAt: Date.now(),
+                  message: `Tract proposal: ${commitMessage || "AI-suggested changes"}`,
+                })
+                .link({ contract: contractId })
+                .link({ sourceCommit: targetCommitId })
+                .link({ targetParticipant: requesterParticipant.id });
+              if (userId) {
+                prUpdate = prUpdate.link({ requester: userId });
+              }
+              transactions.push(prUpdate);
+            }
+
             console.log(`Created new proposed Tract commit: ${targetCommitId}`);
           }
         }

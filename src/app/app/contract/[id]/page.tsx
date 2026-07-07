@@ -17,6 +17,7 @@ import { CommitLog } from "@/components/commit-log";
 import { InviteDialog } from "@/components/invite-dialog";
 import { TractDialog } from "@/components/tract-dialog";
 import { MarkdownView } from "@/components/markdown-view";
+import { DiffViewer } from "@/components/diff-viewer";
 import { CommitDetailDialog } from "@/components/commit-detail-dialog";
 import {
   Dialog,
@@ -77,7 +78,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
     | null
   >(null);
 
-  const [activeTab, setActiveTab] = useState<"document" | "issues">("document");
+  const [activeTab, setActiveTab] = useState<"document" | "issues" | "pull-requests">("document");
+  const [activePullRequestId, setActivePullRequestId] = useState<string | null>(null);
   const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newCommentContent, setNewCommentContent] = useState("");
   const [replyContents, setReplyContents] = useState<{ [issueId: string]: string }>({});
@@ -239,6 +241,15 @@ function ContractEditor({ contractId }: { contractId: string }) {
         comments: {
           creator: {},
         },
+      },
+      pullRequests: {
+        sourceCommit: {
+          author: {},
+        },
+        targetParticipant: {
+          user: {},
+        },
+        requester: {},
       },
       $: { where: { id: contractId } },
     },
@@ -509,7 +520,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
   // Tract AI: background generation + commit
   async function handleTractSubmit(prompt: string) {
-    if (!myParticipant || !myHeadCommitId) return;
+    if (!myParticipant || !myHeadCommitId || !user) return;
     const requesterName = displayName(user?.email, user?.id);
     const baseContent = headCommit?.content ?? "";
 
@@ -537,6 +548,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
       const normalizedAicontent = normalizeMarkdown(data.content);
       const newCommitId = id();
+      const prId = id();
       await db.transact([
         db.tx.commits[newCommitId]
           .update({
@@ -546,6 +558,17 @@ function ContractEditor({ contractId }: { contractId: string }) {
           })
           .link({ contract: contractId })
           .link({ parent: myHeadCommitId }),
+
+        db.tx.pullRequests[prId]
+          .update({
+            status: "open",
+            createdAt: Date.now(),
+            message: `Tract proposal: ${data.message}`,
+          })
+          .link({ contract: contractId })
+          .link({ sourceCommit: newCommitId })
+          .link({ targetParticipant: myParticipant.id })
+          .link({ requester: user.id }),
       ]);
 
       setTractStatus({ state: "done", prompt });
@@ -556,6 +579,72 @@ function ContractEditor({ contractId }: { contractId: string }) {
         prompt,
         error: e instanceof Error ? e.message : "Something went wrong",
       });
+    }
+  }
+
+  async function handlePRApprove(
+    newContent: string,
+    approvedCount: number,
+    totalCount: number
+  ) {
+    if (!activePullRequestId || !user || !contract) return;
+    const activePR = contract.pullRequests?.find((p: any) => p.id === activePullRequestId);
+    if (!activePR) return;
+
+    const targetParticipant = activePR.targetParticipant;
+    const sourceCommit = activePR.sourceCommit;
+    const targetHead = commits.find((c: any) => c.id === targetParticipant?.headCommitId);
+
+    if (!targetParticipant || !targetParticipant.id || !targetHead || !sourceCommit) return;
+
+    const normalizedNewcontent = normalizeMarkdown(newContent);
+    const normalizedSourcecontent = normalizeMarkdown(sourceCommit.content);
+
+    // Fast-forward
+    if (normalizedNewcontent === normalizedSourcecontent) {
+      await db.transact([
+        db.tx.participants[targetParticipant.id].update({
+          headCommitId: sourceCommit.id,
+        }),
+        db.tx.pullRequests[activePR.id].update({
+          status: "merged",
+        }),
+      ]);
+      setActivePullRequestId(null);
+      return;
+    }
+
+    // Partial merge
+    const newCommitId = id();
+    const requesterName = activePR.requester?.email ? displayName(activePR.requester.email) : "Tract";
+    const message = `Accept ${approvedCount}/${totalCount} changes from ${requesterName}'s PR`;
+
+    const txs: any[] = [
+      db.tx.commits[newCommitId]
+        .update({
+          content: normalizedNewcontent,
+          message,
+          createdAt: Date.now(),
+        })
+        .link({ contract: contractId })
+        .link({ parent: targetHead.id }),
+      db.tx.participants[targetParticipant.id].update({
+        headCommitId: newCommitId,
+      }),
+    ];
+
+    if (approvedCount >= totalCount) {
+      txs.push(
+        db.tx.pullRequests[activePR.id].update({
+          status: "merged",
+        })
+      );
+    }
+
+    await db.transact(txs);
+
+    if (approvedCount >= totalCount) {
+      setActivePullRequestId(null);
     }
   }
 
@@ -784,6 +873,19 @@ function ContractEditor({ contractId }: { contractId: string }) {
           }`}
         >
           Issues & Discussions
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("pull-requests");
+            setActivePullRequestId(null);
+          }}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-[2px] ${
+            activeTab === "pull-requests"
+              ? "border-accent text-accent font-semibold"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Pull Requests
         </button>
       </div>
 
@@ -1101,6 +1203,123 @@ function ContractEditor({ contractId }: { contractId: string }) {
             })()}
           </div>
         </div>
+      ) : activeTab === "pull-requests" ? (
+        <div className="space-y-6 min-h-[500px]">
+          {activePullRequestId ? (
+            (() => {
+              const activePR = contract?.pullRequests?.find((p: any) => p.id === activePullRequestId);
+              if (!activePR) return <div>PR not found</div>;
+              
+              const targetParticipant = activePR.targetParticipant;
+              const sourceCommit = activePR.sourceCommit;
+              const targetHead = commits.find((c: any) => c.id === targetParticipant?.headCommitId);
+              
+              if (!targetHead || !sourceCommit) {
+                return <div className="text-sm text-muted-foreground">Missing commit data for this Pull Request</div>;
+              }
+              
+              const isTargetUser = targetParticipant?.user?.id === user?.id;
+              
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground -ml-2 mb-2"
+                        onClick={() => setActivePullRequestId(null)}
+                      >
+                        &larr; Back to Pull Requests
+                      </Button>
+                      <h2 className="text-lg font-semibold tracking-tight">Review Pull Request</h2>
+                      <p className="text-xs text-muted-foreground">
+                        Proposal from {activePR.requester?.email ? displayName(activePR.requester.email) : "Tract"} to merge changes into {targetParticipant?.email ? displayName(targetParticipant.email) : "their version"}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <DiffViewer
+                    key={`${targetHead.id}-${sourceCommit.id}`}
+                    myContent={targetHead.content}
+                    theirContent={sourceCommit.content}
+                    theirEmail={activePR.requester?.email ?? "Tract"}
+                    onApprove={isTargetUser ? handlePRApprove : undefined}
+                    contractId={contractId}
+                    commitId={sourceCommit.id}
+                    issues={contract?.issues ?? []}
+                    commits={commits}
+                    myParticipant={myParticipant}
+                    contractName={contract?.name ?? ""}
+                  />
+                  
+                  {!isTargetUser && (
+                    <div className="p-3 bg-muted/30 border border-border rounded-lg text-xs text-muted-foreground text-center">
+                      Only the target participant ({targetParticipant?.email ? displayName(targetParticipant.email) : "the owner of this version"}) can merge/approve these changes.
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div>
+                  <h3 className="font-semibold text-sm">Pull Requests</h3>
+                  <p className="text-xs text-muted-foreground">Proposed changes waiting to be merged into versions</p>
+                </div>
+              </div>
+              
+              {(!contract?.pullRequests || contract.pullRequests.length === 0) ? (
+                <div className="text-sm text-muted-foreground italic py-12 text-center">
+                  No pull requests yet.
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {contract.pullRequests.map((pr: any) => {
+                    const isOpen = pr.status === "open";
+                    const isTargetMe = pr.targetParticipant?.user?.id === user?.id;
+                    const requesterName = pr.requester?.email ? displayName(pr.requester.email) : "Tract";
+                    const targetName = pr.targetParticipant?.user?.id === user?.id ? "Your version" : (pr.targetParticipant?.email ? displayName(pr.targetParticipant.email) : "unknown");
+                    
+                    return (
+                      <div key={pr.id} className="p-4 rounded-lg border border-border bg-card flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-medium ${
+                              isOpen ? "bg-green-500/10 text-green-500" : "bg-blue-500/10 text-blue-500"
+                            }`}>
+                              {isOpen ? "Open" : "Merged"}
+                            </span>
+                            <span className="font-semibold text-sm text-foreground">
+                              {pr.message || "Pull Request"}
+                            </span>
+                          </div>
+                          <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span>Requested by <strong className="text-foreground">{requesterName}</strong></span>
+                            <span>&bull;</span>
+                            <span>Target: <strong className="text-foreground">{targetName}</strong></span>
+                            <span>&bull;</span>
+                            <span>{new Date(pr.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setActivePullRequestId(pr.id)}
+                          >
+                            {isOpen && isTargetMe ? "Review & Merge" : "View Comparison"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8">
           {/* Main content area */}
@@ -1321,6 +1540,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       issues={contract?.issues ?? []}
                       contractId={contractId}
                       commitId={activeCommit?.id}
+                      triggerTractReply={triggerTractReply}
                     />
                   )}
                 </div>
@@ -1412,6 +1632,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
         onOpenChange={setCommitDetailOpen}
         contractId={contractId}
         issues={contract?.issues ?? []}
+        participants={participants}
+        user={user}
       />
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

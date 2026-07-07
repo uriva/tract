@@ -22,6 +22,9 @@ interface DiffViewerProps {
   commitId?: string;
   issues?: any[];
   onToggleIssueStatus?: (issueId: string, currentStatus: string) => Promise<void>;
+  commits?: any[];
+  myParticipant?: any;
+  contractName?: string;
 }
 
 function getLineIssues(diff: LineDiff, issues: any[], commitId?: string) {
@@ -70,6 +73,9 @@ export function DiffViewer({
   commitId,
   issues = [],
   onToggleIssueStatus,
+  commits = [],
+  myParticipant,
+  contractName = "",
 }: DiffViewerProps) {
   const { user } = db.useAuth();
   const { data: contractData } = db.useQuery({

@@ -50,6 +50,14 @@ export default {
       delete: "auth.id in data.ref('creator.id')",
     },
   },
+  pullRequests: {
+    allow: {
+      view: "auth.id in data.ref('contract.participants.user.id')",
+      create: "auth.id != null",
+      update: "auth.id in data.ref('contract.participants.user.id')",
+      delete: "auth.id in data.ref('contract.participants.user.id')",
+    },
+  },
   $users: {
     allow: {
       view: "auth.id != null",

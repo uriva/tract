@@ -17,6 +17,7 @@ interface MarkdownViewProps {
   issues?: any[];
   contractId?: string;
   commitId?: string;
+  triggerTractReply?: (issueId: string, issueTitle: string, currentComment: string, existingComments: any[]) => Promise<void>;
 }
 
 interface ProseBlockProps {
@@ -26,6 +27,7 @@ interface ProseBlockProps {
   contractId?: string;
   commitId?: string;
   user: any;
+  triggerTractReply?: (issueId: string, issueTitle: string, currentComment: string, existingComments: any[]) => Promise<void>;
 }
 
 export function ProseBlock({
@@ -35,6 +37,7 @@ export function ProseBlock({
   contractId,
   commitId,
   user,
+  triggerTractReply,
 }: ProseBlockProps) {
   const [showCommentForm, setShowCommentForm] = useState(false);
   const [newCommentInput, setNewCommentInput] = useState("");
@@ -88,8 +91,13 @@ export function ProseBlock({
     }
 
     await db.transact(txs);
+    const content = newCommentInput.trim();
     setNewCommentInput("");
     setShowCommentForm(false);
+
+    if (triggerTractReply && /\B@\s*tract\b/i.test(content)) {
+      triggerTractReply(issueId, `Line ${lineNumber} Discussion`, content, []);
+    }
   }
 
   async function handleReplyComment(issueId: string, content: string) {
@@ -107,6 +115,12 @@ export function ProseBlock({
     ]);
 
     setCommentReplyContents({ ...commentReplyContents, [issueId]: "" });
+
+    if (triggerTractReply && /\B@\s*tract\b/i.test(content)) {
+      const activeIssue = issues.find((issue: any) => issue.id === issueId);
+      const previousComments = activeIssue?.comments ?? [];
+      triggerTractReply(issueId, activeIssue?.title ?? `Line ${lineNumber} Discussion`, content, previousComments);
+    }
   }
 
   async function handleDeleteComment(commentId: string) {
@@ -293,6 +307,7 @@ export function MarkdownView({
   issues = [],
   contractId,
   commitId,
+  triggerTractReply,
 }: MarkdownViewProps) {
   const { user } = db.useAuth();
 
@@ -316,6 +331,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <p {...props} dir="auto">{children}</p>
             </ProseBlock>
@@ -327,6 +343,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <h1 {...props} dir="auto">{children}</h1>
             </ProseBlock>
@@ -338,6 +355,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <h2 {...props} dir="auto">{children}</h2>
             </ProseBlock>
@@ -349,6 +367,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <h3 {...props} dir="auto">{children}</h3>
             </ProseBlock>
@@ -360,6 +379,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <h4 {...props} dir="auto">{children}</h4>
             </ProseBlock>
@@ -371,6 +391,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <h5 {...props} dir="auto">{children}</h5>
             </ProseBlock>
@@ -382,6 +403,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <h6 {...props} dir="auto">{children}</h6>
             </ProseBlock>
@@ -393,6 +415,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <li {...props} dir="auto">{children}</li>
             </ProseBlock>
@@ -404,6 +427,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <ol {...props} dir="auto">{children}</ol>
             </ProseBlock>
@@ -415,6 +439,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <ul {...props} dir="auto">{children}</ul>
             </ProseBlock>
@@ -426,6 +451,7 @@ export function MarkdownView({
               contractId={contractId}
               commitId={commitId}
               user={user}
+              triggerTractReply={triggerTractReply}
             >
               <blockquote {...props} dir="auto">{children}</blockquote>
             </ProseBlock>

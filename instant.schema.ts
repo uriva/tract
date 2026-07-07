@@ -37,6 +37,11 @@ const _schema = i.schema({
       content: i.string(),
       createdAt: i.number().indexed(),
     }),
+    pullRequests: i.entity({
+      status: i.string(), // "open" | "merged"
+      createdAt: i.number().indexed(),
+      message: i.string().optional(),
+    }),
   },
   links: {
     contractCommits: {
@@ -174,6 +179,56 @@ const _schema = i.schema({
         on: "$users",
         has: "many",
         label: "comments",
+      },
+    },
+    contractPullRequests: {
+      forward: {
+        on: "pullRequests",
+        has: "one",
+        label: "contract",
+        onDelete: "cascade",
+      },
+      reverse: {
+        on: "contracts",
+        has: "many",
+        label: "pullRequests",
+      },
+    },
+    pullRequestSourceCommit: {
+      forward: {
+        on: "pullRequests",
+        has: "one",
+        label: "sourceCommit",
+      },
+      reverse: {
+        on: "commits",
+        has: "many",
+        label: "pullRequests",
+      },
+    },
+    pullRequestTargetParticipant: {
+      forward: {
+        on: "pullRequests",
+        has: "one",
+        label: "targetParticipant",
+        onDelete: "cascade",
+      },
+      reverse: {
+        on: "participants",
+        has: "many",
+        label: "pullRequests",
+      },
+    },
+    pullRequestRequester: {
+      forward: {
+        on: "pullRequests",
+        has: "one",
+        label: "requester",
+      },
+      reverse: {
+        on: "$users",
+        has: "many",
+        label: "requestedPullRequests",
       },
     },
   },

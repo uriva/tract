@@ -9,6 +9,9 @@ import {
 } from "@/components/ui/dialog";
 import { DiffViewer } from "@/components/diff-viewer";
 import { displayName } from "@/lib/utils";
+import db from "@/lib/instant";
+import { id } from "@instantdb/react";
+import { Button } from "@/components/ui/button";
 
 interface Commit {
   id: string;
@@ -26,6 +29,8 @@ interface CommitDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   contractId?: string;
   issues?: any[];
+  participants?: any[];
+  user?: any;
 }
 
 export function CommitDetailDialog({
@@ -35,6 +40,8 @@ export function CommitDetailDialog({
   onOpenChange,
   contractId,
   issues = [],
+  participants = [],
+  user,
 }: CommitDetailDialogProps) {
   if (!commit) return null;
 
@@ -82,6 +89,48 @@ export function CommitDetailDialog({
             />
           </div>
         </div>
+
+        {/* Ask to include commit */}
+        {user && participants.length > 1 && (
+          <div className="border-t border-border pt-4 mt-2 shrink-0 space-y-2">
+            <div className="text-xs font-semibold text-muted-foreground uppercase">
+              Request inclusion of this commit
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {participants
+                .filter((p) => p.user?.id !== user.id) // Can't ask yourself
+                .map((p) => {
+                  const name = displayName(p.email, p.user?.id);
+                  return (
+                    <Button
+                      key={p.id}
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                      onClick={async () => {
+                        const prId = id();
+                        await db.transact([
+                          db.tx.pullRequests[prId]
+                            .update({
+                              status: "open",
+                              createdAt: Date.now(),
+                              message: `Request to include commit: ${commit.message}`,
+                            })
+                            .link({ contract: contractId || "" })
+                            .link({ sourceCommit: commit.id })
+                            .link({ targetParticipant: p.id })
+                            .link({ requester: user.id }),
+                        ]);
+                        alert(`Request sent to ${name}!`);
+                      }}
+                    >
+                      Ask {name}
+                    </Button>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
