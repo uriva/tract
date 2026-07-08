@@ -4,6 +4,55 @@ export interface LayoutCommit {
   parent?: { id: string };
 }
 
+export interface VisibilityCommit {
+  id: string;
+  author?: { id: string } | null;
+  parent?: { id: string } | null;
+}
+
+/**
+ * Filter out "Tract" commits (those with no author) that are not an ancestor
+ * of any real user commit (a commit that has an author).
+ *
+ * Rationale: Tract may create intermediate/proposal commits while working. Such
+ * a commit should only appear in the history if a real user commit descends
+ * from it (i.e. it became part of a user's actual version lineage). Orphan Tract
+ * commits — dead-end proposals nobody built on — are hidden.
+ *
+ * A commit is visible when either:
+ *   - it has an author (a real user commit), or
+ *   - it is a (transitive) parent of some authored commit, or
+ *   - it is "pinned" (e.g. a participant's current head commit) or a
+ *     (transitive) parent of a pinned commit.
+ *
+ * `pinnedIds` keeps commits that must remain visible even without an author —
+ * such as a participant head that points at a Tract proposal — so the history
+ * graph stays consistent with the participant markers drawn on it.
+ */
+export function visibleCommits<T extends VisibilityCommit>(
+  commits: T[],
+  pinnedIds?: Iterable<string>,
+): T[] {
+  const byId = new Map(commits.map((c) => [c.id, c]));
+  const isAuthored = (c: VisibilityCommit) => Boolean(c.author?.id);
+
+  // A commit is a visibility "seed" if it is authored or explicitly pinned.
+  // Every seed and every ancestor of a seed is visible.
+  const visible = new Set<string>();
+  const markAncestors = (startId: string | undefined) => {
+    let id = startId;
+    while (id && !visible.has(id)) {
+      visible.add(id);
+      id = byId.get(id)?.parent?.id;
+    }
+  };
+
+  for (const c of commits) if (isAuthored(c)) markAncestors(c.id);
+  for (const id of pinnedIds ?? []) markAncestors(id);
+
+  return commits.filter((c) => visible.has(c.id));
+}
+
 export interface LayoutNode<T extends LayoutCommit = LayoutCommit> {
   commit: T;
   lane: number;

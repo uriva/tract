@@ -1,113 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  activateTract,
+  adminDb,
+  dialogConversationId,
+  prompt2botSecret,
+} from "@/lib/tract-agent/config";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${GEMINI_API_KEY}`;
-
+/**
+ * Triggered from the "Ask Tract" dialog. Activates the Tract agent with the
+ * participant's free-text request. The agent reads the contract, creates a
+ * proposed commit off the requester's head, and opens a pull request back to
+ * them for review — it never edits their version directly.
+ */
 export async function POST(req: NextRequest) {
-  if (!GEMINI_API_KEY) {
+  if (!prompt2botSecret()) {
     return NextResponse.json(
-      { error: "GEMINI_API_KEY not configured" },
+      { error: "PROMPT2BOT_SECRET not configured" },
       { status: 500 },
     );
   }
 
-  const { content, prompt, contractName } = await req.json();
-
-  if (!prompt) {
-    return NextResponse.json({ error: "prompt is required" }, { status: 400 });
-  }
-
-  const systemPrompt = `You are Tract, an AI assistant that helps negotiate and draft contracts.
-You are given the current content of a contract (in Markdown) and a request from a participant.
-Your job is to apply targeted modifications to the contract.
-Instead of copying and returning the entire contract text, you MUST send a PATCH. You do this by specifying precise SEARCH and REPLACE blocks in JSON format.
-
-You MUST respond with a JSON object containing the following keys:
-1. "replacements" (array of objects): A list of replacement blocks to apply to the contract. Each object must have:
-   - "search" (string): The exact block of text from the current contract that you want to change. Be precise and include enough surrounding context to ensure a unique match.
-   - "replace" (string): The new text that should replace the search block.
-2. "commitMessage" (string): A short, concise commit message (1-2 sentences) summarizing what changed.`;
-
-  const userPrompt = contractName
-    ? `Contract: "${contractName}"\n\nCurrent content:\n${content || "(empty)"}\n\nRequest: ${prompt}`
-    : `Current content:\n${content || "(empty)"}\n\nRequest: ${prompt}`;
-
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: userPrompt }],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: "application/json",
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("Gemini API error:", err);
+  const { contractId, prompt, userId } = await req.json();
+  if (!contractId || !prompt || !userId) {
     return NextResponse.json(
-      { error: "Failed to generate content" },
-      { status: 502 },
+      { error: "contractId, prompt and userId are required" },
+      { status: 400 },
     );
   }
 
-  const data = await res.json();
-  const responseJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-  if (!responseJsonText.trim()) {
-    return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
+  // Find the requesting participant + their head commit so the agent has an
+  // explicit base to build the proposal on.
+  const result = await adminDb.query({
+    contracts: {
+      $: { where: { id: contractId } },
+      participants: { user: {} },
+    },
+  });
+  const contract = result?.contracts?.[0];
+  if (!contract) {
+    return NextResponse.json({ error: "Contract not found" }, { status: 404 });
   }
-
-  let parsedResponse;
-  try {
-    parsedResponse = JSON.parse(responseJsonText.trim());
-  } catch (parseErr) {
-    console.error("Failed to parse JSON response from Gemini:", responseJsonText);
-    return NextResponse.json({ error: "Invalid JSON response from AI" }, { status: 502 });
-  }
-
-  const { replacements, commitMessage } = parsedResponse;
-
-  // Apply the replacements to the contract content
-  let updatedContractContent = content || "";
-  let success = false;
-
-  if (Array.isArray(replacements) && replacements.length > 0) {
-    for (const item of replacements) {
-      if (item.search && item.replace !== undefined) {
-        const index = updatedContractContent.indexOf(item.search);
-        if (index !== -1) {
-          updatedContractContent =
-            updatedContractContent.slice(0, index) +
-            item.replace +
-            updatedContractContent.slice(index + item.search.length);
-          success = true;
-        } else {
-          console.warn(`Could not find search block to replace: "${item.search}"`);
-        }
-      }
-    }
-  }
-
-  if (!success && (content || "").trim()) {
+  const me = (contract.participants ?? []).find(
+    (p) => p.user?.id === userId,
+  );
+  if (!me) {
     return NextResponse.json(
-      { error: "AI failed to match and apply any search/replace modifications to the contract content" },
-      { status: 502 },
+      { error: "Requesting user is not a participant" },
+      { status: 403 },
     );
   }
 
-  return NextResponse.json({
-    content: updatedContractContent,
-    message: commitMessage || "AI-suggested changes",
-  });
+  const description =
+    `A participant is asking you to help with their contract via the "Ask Tract" dialog.
+Contract ID: ${contractId}
+Requesting participant ID: ${me.id}
+Requesting user ID: ${userId}
+Their current head commit ID: ${me.headCommitId ?? "(none)"}
+
+Their request:
+"""
+${prompt}
+"""
+
+Read the contract and their current version, then create a new proposed commit based on their head commit implementing the request, and open a pull request to this participant so they can review and accept it. Do not modify their version directly.`;
+
+  await activateTract(dialogConversationId(contractId, userId), description);
+
+  return NextResponse.json({ success: true });
 }

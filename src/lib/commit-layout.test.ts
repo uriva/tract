@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildLayout, type LayoutCommit } from "./commit-layout";
+import {
+  buildLayout,
+  visibleCommits,
+  type LayoutCommit,
+  type VisibilityCommit,
+} from "./commit-layout";
 
 describe("buildLayout", () => {
   it("returns empty array for no commits", () => {
@@ -146,5 +151,75 @@ describe("buildLayout", () => {
 
     // A and B should be on different lanes since they diverge
     expect(lanes.get("A")).not.toBe(lanes.get("B"));
+  });
+});
+
+const ids = (commits: VisibilityCommit[]) => commits.map((c) => c.id).sort();
+
+describe("visibleCommits", () => {
+  const user = { id: "u1" };
+
+  it("keeps authored commits", () => {
+    const commits: VisibilityCommit[] = [
+      { id: "A", author: user },
+      { id: "B", author: user, parent: { id: "A" } },
+    ];
+    expect(ids(visibleCommits(commits))).toEqual(["A", "B"]);
+  });
+
+  it("hides an orphan Tract commit with no authored descendant", () => {
+    const commits: VisibilityCommit[] = [
+      { id: "root", author: user },
+      { id: "tract", parent: { id: "root" } }, // dead-end proposal
+    ];
+    expect(ids(visibleCommits(commits))).toEqual(["root"]);
+  });
+
+  it("keeps a Tract commit that is an ancestor of a user commit", () => {
+    const commits: VisibilityCommit[] = [
+      { id: "root", author: user },
+      { id: "tract", parent: { id: "root" } },
+      { id: "mine", author: user, parent: { id: "tract" } },
+    ];
+    expect(ids(visibleCommits(commits))).toEqual(["mine", "root", "tract"]);
+  });
+
+  it("keeps a whole chain of Tract commits leading to a user commit", () => {
+    const commits: VisibilityCommit[] = [
+      { id: "t1" },
+      { id: "t2", parent: { id: "t1" } },
+      { id: "t3", parent: { id: "t2" } },
+      { id: "mine", author: user, parent: { id: "t3" } },
+    ];
+    expect(ids(visibleCommits(commits))).toEqual(["mine", "t1", "t2", "t3"]);
+  });
+
+  it("hides a Tract branch off the mainline but keeps the mainline", () => {
+    const commits: VisibilityCommit[] = [
+      { id: "root", author: user },
+      { id: "mine", author: user, parent: { id: "root" } },
+      { id: "proposal", parent: { id: "root" } }, // Tract branched, unused
+    ];
+    expect(ids(visibleCommits(commits))).toEqual(["mine", "root"]);
+  });
+
+  it("keeps a pinned Tract commit and its ancestors even without a descendant", () => {
+    const commits: VisibilityCommit[] = [
+      { id: "root", author: user },
+      { id: "proposal", parent: { id: "root" } }, // someone's head points here
+    ];
+    // proposal is a participant head -> pinned
+    expect(ids(visibleCommits(commits, ["proposal"]))).toEqual([
+      "proposal",
+      "root",
+    ]);
+  });
+
+  it("treats null author/parent as absent", () => {
+    const commits: VisibilityCommit[] = [
+      { id: "root", author: null, parent: null },
+      { id: "mine", author: user, parent: { id: "root" } },
+    ];
+    expect(ids(visibleCommits(commits))).toEqual(["mine", "root"]);
   });
 });

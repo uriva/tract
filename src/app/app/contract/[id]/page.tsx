@@ -30,6 +30,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { SignDialog } from "@/components/sign-dialog";
 import { displayName, assignParticipantColors, normalizeMarkdown, isGuestUser, isInviteTemplateParticipant } from "@/lib/utils";
+import { visibleCommits } from "@/lib/commit-layout";
 
 const SUMMARY_TRUNCATE = 180;
 
@@ -423,6 +424,17 @@ function ContractEditor({ contractId }: { contractId: string }) {
     return result;
   }, [commits, participants, user]);
 
+  // Commits shown in the History graph. Tract commits (no author) that are not
+  // an ancestor of any real user commit are hidden — they are dead-end
+  // proposals nobody built on. Participant head commits are pinned so their
+  // markers stay consistent even when they point at a Tract proposal.
+  const historyCommits = useMemo(() => {
+    const pinned = participants
+      .map((p) => p.headCommitId)
+      .filter((id): id is string => Boolean(id));
+    return visibleCommits(commits, pinned);
+  }, [commits, participants]);
+
   const [squashing, setSquashing] = useState(false);
 
   // Scroll to comment when it becomes available in the DOM
@@ -698,8 +710,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
   // Tract AI: background generation + commit
   async function handleTractSubmit(prompt: string) {
     if (!myParticipant || !myHeadCommitId || !user) return;
-    const requesterName = displayName(user?.email, user?.id);
-    const baseContent = headCommit?.content ?? "";
 
     setTractStatus({ state: "working", prompt });
 
@@ -708,46 +718,19 @@ function ContractEditor({ contractId }: { contractId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          content: baseContent,
+          contractId,
           prompt,
-          contractName: contract!.name,
+          userId: user.id,
         }),
       });
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to generate");
+        throw new Error(data.error || "Failed to reach Tract");
       }
 
-      const data = await res.json();
-      const truncatedPrompt = prompt.length > 120 ? prompt.slice(0, 120) + "..." : prompt;
-      const fullMsg = `${data.message}\n\nWritten as per ${requesterName}'s request: "${truncatedPrompt}"`;
-
-      const normalizedAicontent = normalizeMarkdown(data.content);
-      const newCommitId = id();
-      const prId = id();
-      await db.transact([
-        db.tx.commits[newCommitId]
-          .update({
-            content: normalizedAicontent,
-            message: fullMsg,
-            createdAt: Date.now(),
-          })
-          .link({ contract: contractId })
-          .link({ parent: myHeadCommitId }),
-
-        db.tx.pullRequests[prId]
-          .update({
-            status: "open",
-            createdAt: Date.now(),
-            message: `Tract proposal: ${data.message}`,
-          })
-          .link({ contract: contractId })
-          .link({ sourceCommit: newCommitId })
-          .link({ targetParticipant: myParticipant.id })
-          .link({ requester: user.id }),
-      ]);
-
+      // Tract works asynchronously: it will create a proposed commit and open a
+      // pull request to this participant. Those changes stream in via InstantDB.
       setTractStatus({ state: "done", prompt });
       setTimeout(() => setTractStatus(null), 4000);
     } catch (e) {
@@ -1783,7 +1766,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
             <Separator />
 
             <CommitLog
-              commits={commits}
+              commits={historyCommits}
               headCommitId={myHeadCommitId}
               viewingCommitId={activeCommitId}
               participants={participants}
