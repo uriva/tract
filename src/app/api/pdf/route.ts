@@ -188,13 +188,15 @@ export async function POST(req: NextRequest) {
       } = opts;
       const dir = forceDir ?? baseDir(text);
       const visual = hasHebrew(text) || dir === "rtl" ? toVisual(text, dir) : text;
+      // Strip bidi control characters before rendering since the font doesn't map glyphs for them.
+      const cleanVisual = visual.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "");
       const left = PAGE_LEFT + indent * 20;
       const width = CONTENT_WIDTH - indent * 20;
       doc
         .font(font)
         .fontSize(size)
         .fillColor(color)
-        .text(visual, left, doc.y, {
+        .text(cleanVisual, left, doc.y, {
           width,
           align: dir === "rtl" ? "right" : "left",
           link,
@@ -348,11 +350,13 @@ export async function POST(req: NextRequest) {
                 const raw = cells[c]?.text ?? "";
                 const dir = baseDir(raw);
                 const visual = hasHebrew(raw) ? toVisual(raw, dir) : raw;
+                // Strip bidi control characters before rendering since the font doesn't map glyphs for them.
+                const cleanVisual = visual.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "");
                 doc
                   .font(bold ? FONT_BOLD : FONT_REGULAR)
                   .fontSize(11)
                   .fillColor(COLOR_TEXT)
-                  .text(visual, startX + c * colWidth + 4, rowY, {
+                  .text(cleanVisual, startX + c * colWidth + 4, rowY, {
                     width: colWidth - 8,
                     align: dir === "rtl" ? "right" : "left",
                   });
