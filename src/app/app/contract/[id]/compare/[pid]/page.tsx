@@ -2,6 +2,7 @@
 
 import { useState, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
@@ -79,8 +80,14 @@ function CompareView({
       if (!res.ok) {
         throw new Error("Failed to get reply from Tract");
       }
+      toast.success("Sent to Tract", {
+        description: "Tract is on it — its reply will appear here shortly.",
+      });
     } catch (err) {
       console.error("Error triggering Tract reply:", err);
+      toast.error("Couldn't reach Tract", {
+        description: "Your comment was posted, but Tract wasn't notified. Try mentioning it again.",
+      });
     } finally {
       setTypingIssues(prev => ({ ...prev, [issueId]: false }));
     }

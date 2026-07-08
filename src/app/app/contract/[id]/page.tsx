@@ -31,6 +31,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SignDialog } from "@/components/sign-dialog";
 import { displayName, assignParticipantColors, normalizeMarkdown, isGuestUser, isInviteTemplateParticipant } from "@/lib/utils";
 import { visibleCommits } from "@/lib/commit-layout";
+import { toast } from "sonner";
 
 const SUMMARY_TRUNCATE = 180;
 
@@ -193,8 +194,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
       if (!res.ok) {
         throw new Error("Failed to get reply from Tract");
       }
+      toast.success("Sent to Tract", {
+        description: "Tract is on it — its reply will appear here shortly.",
+      });
     } catch (err) {
       console.error("Error triggering Tract reply:", err);
+      toast.error("Couldn't reach Tract", {
+        description: "Your comment was posted, but Tract wasn't notified. Try mentioning it again.",
+      });
     } finally {
       setTypingIssues(prev => ({ ...prev, [issueId]: false }));
     }
