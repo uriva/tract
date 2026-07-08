@@ -31,6 +31,11 @@ interface CommitLogProps {
   onSelectCommit?: (commitId: string) => void;
   onCheckout?: (commitId: string) => void;
   colorMap?: Map<string, string>;
+  /** Map of tip commit id -> chain of commit ids (oldest first) that can be
+   * squashed into that tip. Only chains of length >= 2 are present. */
+  squashableChains?: Map<string, string[]>;
+  onSquash?: (tipCommitId: string) => void;
+  squashing?: boolean;
 }
 
 export function CommitLog({
@@ -42,6 +47,9 @@ export function CommitLog({
   onSelectCommit,
   onCheckout,
   colorMap,
+  squashableChains,
+  onSquash,
+  squashing,
 }: CommitLogProps) {
   const layout = useMemo(() => buildLayout(commits), [commits]);
   const maxLane = useMemo(
@@ -201,10 +209,11 @@ export function CommitLog({
             const isTract = !commit.author;
             const authorLabel = isTract ? "Tract" : displayName(commit.author?.email, commit.author?.id);
             const onThisCommit = commitParticipants.get(commit.id) ?? [];
+            const squashChain = squashableChains?.get(commit.id);
 
             return (
+              <div key={commit.id}>
               <button
-                key={commit.id}
                 onClick={() => onSelectCommit?.(commit.id)}
                 className={`absolute right-0 text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
                   isViewing
@@ -261,6 +270,25 @@ export function CommitLog({
                   <span title={commit.author?.email || undefined}>{authorLabel}</span> &middot; {getTimeAgo(commit.createdAt)}
                 </div>
               </button>
+              {squashChain && onSquash && (
+                <button
+                  type="button"
+                  disabled={squashing}
+                  title={`Squash ${squashChain.length} of your consecutive commits into one`}
+                  className={`absolute z-10 inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-accent/40 bg-background text-accent hover:bg-accent/10 transition-colors disabled:opacity-50 disabled:pointer-events-none`}
+                  style={{
+                    top: row * ROW_H + ROW_H - 8 - 20,
+                    right: 8,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSquash(commit.id);
+                  }}
+                >
+                  {squashing ? "Squashing…" : `Squash my ${squashChain.length} commits`}
+                </button>
+              )}
+              </div>
             );
           })}
         </div>

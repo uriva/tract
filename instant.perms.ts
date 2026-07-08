@@ -15,8 +15,8 @@ export default {
     allow: {
       // Participants of the parent contract can view
       view: "auth.id in data.ref('contract.participants.user.id')",
-      // Any authenticated user can create commits
-      create: "auth.id != null",
+      // Only non-guest users (with an email) can create commits. Guests are view-only.
+      create: "auth.id != null && auth.email != null",
       // Allow updating a commit if the user is the author (e.g. for squashing/amending)
       update: "auth.id in data.ref('author.id')",
       delete: "false",
@@ -28,8 +28,9 @@ export default {
       view: "auth.id in data.ref('contract.participants.user.id')",
       // Any authenticated user (needed for invite flow)
       create: "auth.id != null",
-      // Participants of the same contract can update (e.g. move version pointer)
-      update: "auth.id in data.ref('contract.participants.user.id')",
+      // Participants of the same contract can update. Guests (no email) may not
+      // move a version pointer (headCommitId) — they are view-only.
+      update: "auth.id in data.ref('contract.participants.user.id') && (auth.email != null || !('headCommitId' in request.modifiedFields))",
       // Only the contract owner can remove participants, or participants can remove themselves
       delete: "auth.id in data.ref('contract.owner.id') || auth.id in data.ref('user.id')",
     },

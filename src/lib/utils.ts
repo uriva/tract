@@ -71,6 +71,25 @@ export function displayName(email: string | null | undefined, userId?: string): 
   return "guest";
 }
 
+/**
+ * A guest is an authenticated user without an email (anonymous "Try as guest"
+ * sign-in). Guests are view-only: they cannot commit or hold a version pointer.
+ */
+export function isGuestUser(user: { email?: string | null } | null | undefined): boolean {
+  return !!user && !user.email;
+}
+
+/**
+ * An invite-template participant is a placeholder record created for an invite
+ * link (no linked user, no email). It represents the invite itself, not a real
+ * participant, so it must never be counted as an approver or shown as a version.
+ */
+export function isInviteTemplateParticipant(
+  p: { email?: string | null; user?: { id?: string } | null },
+): boolean {
+  return !p.user?.id && !p.email;
+}
+
 /** Neutral participant colors (no red/green to avoid diff confusion). */
 export const PARTICIPANT_COLORS = [
   "#7c8ab8", // slate blue

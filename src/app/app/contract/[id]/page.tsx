@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SignDialog } from "@/components/sign-dialog";
-import { displayName, assignParticipantColors, normalizeMarkdown } from "@/lib/utils";
+import { displayName, assignParticipantColors, normalizeMarkdown, isGuestUser, isInviteTemplateParticipant } from "@/lib/utils";
 
 const SUMMARY_TRUNCATE = 180;
 
@@ -257,7 +257,13 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
   const contract = data?.contracts?.[0];
   const commits = contract?.commits ?? [];
-  const participants = contract?.participants ?? [];
+  // Real participants only. Invite-link template records (no user, no email)
+  // are placeholders for the invite itself and must never be treated as a
+  // person, approver, or version.
+  const participants = (contract?.participants ?? []).filter(
+    (p: any) => !isInviteTemplateParticipant(p),
+  );
+  const isGuest = isGuestUser(user);
   const colorMap = useMemo(() => assignParticipantColors(participants), [participants]);
   const mentionSuggestions = useMemo(() => {
     return ["tract", ...participants.map((p: any) => p.email ? displayName(p.email) : "").filter(Boolean)];
@@ -302,6 +308,69 @@ function ContractEditor({ contractId }: { contractId: string }) {
     if (othersAdopted) return false;
     return true;
   }, [activeCommit, user, commitsWithChildren, participants]);
+
+  // Compute, for each of the user's commits, the maximal linear chain of
+  // consecutive commits all owned by the user that ends at that commit. A commit
+  // is the tip of a squashable chain when this chain has length >= 2.
+  // Guards mirror the /api/squash-commits route:
+  //   - every commit in the chain is authored by the current user
+  //   - the chain is linear (each intermediate has exactly one child)
+  //   - no other participant has adopted an intermediate commit
+  const squashableChains = useMemo(() => {
+    const result = new Map<string, string[]>(); // tipId -> [C1..Cn] ids (oldest first)
+    if (!user) return result;
+    const map = new Map(commits.map((c) => [c.id, c]));
+    const childrenCount = new Map<string, number>();
+    for (const c of commits) {
+      if (c.parent?.id)
+        childrenCount.set(c.parent.id, (childrenCount.get(c.parent.id) ?? 0) + 1);
+    }
+    for (const tip of commits) {
+      if (tip.author?.id !== user.id) continue;
+      const chain: string[] = [tip.id];
+      let cur = tip;
+      while (cur.parent?.id) {
+        const parent = map.get(cur.parent.id);
+        if (!parent) break;
+        if (parent.author?.id !== user.id) break;
+        if ((childrenCount.get(parent.id) ?? 0) !== 1) break;
+        const adoptedByOther = participants.some(
+          (p) => p.headCommitId === parent.id && p.user?.id !== user.id,
+        );
+        if (adoptedByOther) break;
+        chain.push(parent.id);
+        cur = parent;
+      }
+      if (chain.length >= 2) {
+        chain.reverse(); // oldest first
+        result.set(tip.id, chain);
+      }
+    }
+    return result;
+  }, [commits, participants, user]);
+
+  const [squashing, setSquashing] = useState(false);
+
+  async function handleSquashCommits(tipCommitId: string) {
+    if (!user) return;
+    setSquashing(true);
+    try {
+      const res = await fetch("/api/squash-commits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipCommitId, userId: user.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to squash");
+      }
+      setViewingCommitId(null);
+    } catch (e) {
+      console.error("Squash commits failed:", e);
+    } finally {
+      setSquashing(false);
+    }
+  }
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -415,11 +484,17 @@ function ContractEditor({ contractId }: { contractId: string }) {
   // Remove a participant (owner only)
   async function handleRemoveParticipant(participantId: string) {
     if (!isOwner) return;
-    await db.transact([db.tx.participants[participantId].delete()]);
+    try {
+      await db.transact([db.tx.participants[participantId].delete()]);
+    } catch (err) {
+      console.error("Failed to remove participant:", err);
+      alert("Failed to remove participant. Please try again.");
+    }
   }
 
   // Move HEAD to a different commit
   async function handleCheckout(commitId: string) {
+    if (isGuestUser(user)) return; // Guests are view-only
     if (!myParticipant) return;
     await db.transact([
       db.tx.participants[myParticipant.id].update({
@@ -435,12 +510,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
   // Switch to edit mode (always edits HEAD)
   function enterEditMode() {
+    if (isGuestUser(user)) return; // Guests are view-only
     setViewingCommitId(null);
     setContent(headCommit?.content ?? "");
     setMode("edit");
   }
 
   const handleCommit = useCallback(async () => {
+    if (isGuestUser(user)) return; // Guests are view-only
     if (!hasChanges || !user || !myParticipant || content === null) return;
     setSaving(true);
     setCommitError("");
@@ -724,9 +801,12 @@ function ContractEditor({ contractId }: { contractId: string }) {
   }, [participants]);
 
   // Who approves the currently displayed version? (deduplicated by user ID or email)
+  // Guests (participants without an email) are view-only and never approve a version.
   const approvers = useMemo(() => {
     if (!activeCommitId) return [];
-    const list = participants.filter((p: any) => p.headCommitId === activeCommitId);
+    const list = participants.filter(
+      (p: any) => p.headCommitId === activeCommitId && !!p.email,
+    );
     const seen = new Set<string>();
     return list.filter((p: any) => {
       const key = p.user?.id || p.email || p.id;
@@ -801,7 +881,12 @@ function ContractEditor({ contractId }: { contractId: string }) {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {mode === "view" && !isViewingHistory && (
+          {isGuest && (
+            <span className="text-xs text-muted-foreground border border-border rounded px-2 py-1">
+              View-only (guest)
+            </span>
+          )}
+          {!isGuest && mode === "view" && !isViewingHistory && (
             <Button size="sm" variant="outline" onClick={enterEditMode}>
               Edit
             </Button>
@@ -830,14 +915,16 @@ function ContractEditor({ contractId }: { contractId: string }) {
               Back to your version
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setTractOpen(true)}
-            disabled={tractStatus?.state === "working"}
-          >
-            Ask Tract
-          </Button>
+          {!isGuest && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTractOpen(true)}
+              disabled={tractStatus?.state === "working"}
+            >
+              Ask Tract
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -846,9 +933,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
           >
             {downloading ? "Generating..." : "Download PDF"}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
-            Invite
-          </Button>
+          {!isGuest && (
+            <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}>
+              Invite
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1463,7 +1552,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                           ? <> by <span title={activeCommit.author.email}>{displayName(activeCommit.author.email)}</span></>
                           : " by Tract"}
                       </p>
-                      {isViewingHistory && (
+                      {isViewingHistory && !isGuest && (
                         <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
                           Adopt this version
                         </Button>
@@ -1503,7 +1592,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       >
                         Comment on this version
                       </Button>
-                      {canDeleteActiveCommit && (
+                      {canDeleteActiveCommit && !isGuest && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -1605,6 +1694,9 @@ function ContractEditor({ contractId }: { contractId: string }) {
               onSelectCommit={handleSelectCommit}
               onCheckout={handleCheckout}
               colorMap={colorMap}
+              squashableChains={isGuest ? undefined : squashableChains}
+              onSquash={handleSquashCommits}
+              squashing={squashing}
             />
           </div>
         </div>

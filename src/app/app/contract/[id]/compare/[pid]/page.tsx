@@ -11,7 +11,7 @@ import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
 import { DiffViewer } from "@/components/diff-viewer";
 import { computeLineDiffs } from "@/lib/diff";
-import { displayName, normalizeMarkdown } from "@/lib/utils";
+import { displayName, normalizeMarkdown, isInviteTemplateParticipant } from "@/lib/utils";
 
 // Count the number of change hunks between two documents (a hunk is a run of
 // consecutive changed lines), matching how the diff viewer counts changes.
@@ -209,7 +209,10 @@ function CompareView({
 
   const contract = data?.contracts?.[0];
   const commits = contract?.commits ?? [];
-  const participants = contract?.participants ?? [];
+  // Exclude invite-link template records (no user, no email) — they are not real participants.
+  const participants = (contract?.participants ?? []).filter(
+    (p: any) => !isInviteTemplateParticipant(p),
+  );
   const mentionSuggestions = useMemo(() => {
     return ["tract", ...participants.map((p: any) => p.email ? displayName(p.email) : "").filter(Boolean)];
   }, [participants]);
