@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { computeLineDiffs, applySelectedChanges, pairWordDiffs, LineDiff, type WordSegment } from "@/lib/diff";
 import { Checkbox } from "@/components/ui/checkbox";
+import { LinkifiedText } from "@/components/linkified-text";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -748,7 +749,7 @@ function DiffLine({
                             </button>
                           )}
                         </div>
-                        <p className="text-foreground/90 whitespace-pre-wrap pl-1" dir="auto">{comment.content}</p>
+                        <p className="text-foreground/90 whitespace-pre-wrap pl-1" dir="auto"><LinkifiedText text={comment.content} /></p>
                       </div>
                     );
                   })}

@@ -32,6 +32,7 @@ import { SignDialog } from "@/components/sign-dialog";
 import { displayName, assignParticipantColors, normalizeMarkdown, isGuestUser, isInviteTemplateParticipant } from "@/lib/utils";
 import { visibleCommits } from "@/lib/commit-layout";
 import { toast } from "sonner";
+import { LinkifiedText } from "@/components/linkified-text";
 
 const SUMMARY_TRUNCATE = 180;
 
@@ -469,6 +470,29 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
     return () => clearInterval(interval);
   }, [isLoading, activeTab, selectedIssueId, activePullRequestId]);
+
+  // Auto-scroll the comment thread to the newest comment (or Tract's typing
+  // indicator) whenever a comment is added to the currently open issue.
+  const commentsStreamRef = useRef<HTMLDivElement>(null);
+  const selectedIssueCommentCount = useMemo(() => {
+    if (!selectedIssueId) return 0;
+    const issue = (contract?.issues ?? []).find((i) => i.id === selectedIssueId);
+    return issue?.comments?.length ?? 0;
+  }, [contract?.issues, selectedIssueId]);
+  const selectedIssueTyping = selectedIssueId
+    ? Boolean(typingIssues[selectedIssueId])
+    : false;
+
+  useEffect(() => {
+    const el = commentsStreamRef.current;
+    if (!el) return;
+    // Don't hijack a deep-link that targets a specific comment.
+    const hasCommentDeepLink = new URLSearchParams(window.location.search).has(
+      "comment",
+    );
+    if (hasCommentDeepLink) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [selectedIssueId, selectedIssueCommentCount, selectedIssueTyping]);
 
   async function handleSquashCommits(tipCommitId: string) {
     if (!user) return;
@@ -1244,7 +1268,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                   </div>
 
                   {/* Comments Stream */}
-                  <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 pl-2">
+                  <div ref={commentsStreamRef} className="space-y-4 max-h-[350px] overflow-y-auto pr-2 pl-2">
                     {comments.length === 0 ? (
                       <p className="text-xs text-muted-foreground italic">No comments yet.</p>
                     ) : (
@@ -1293,42 +1317,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                               )}
                             </div>
                             <div className="text-foreground/90 whitespace-pre-wrap" dir="auto">
-                              {(() => {
-                                const match = comment.content.match(/\(Done in version ([a-f0-9\-]+)\)/);
-                                if (match) {
-                                  const commitId = match[1];
-                                  const before = comment.content.slice(0, match.index);
-                                  const after = comment.content.slice(match.index! + match[0].length);
-                                  return (
-                                    <div className="space-y-2">
-                                      <p>{before.trim()}</p>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="text-xs h-7 px-2.5 border-accent/40 hover:bg-accent/10 hover:text-accent font-medium flex items-center gap-1.5"
-                                          onClick={() => router.push(`/app/contract/${contractId}/compare/${commitId}`)}
-                                        >
-                                          <span>Compare & Merge</span>
-                                        </Button>
-                                        <Button
-                                          variant="secondary"
-                                          size="sm"
-                                          className="text-xs h-7 px-2.5 flex items-center gap-1.5"
-                                          onClick={() => {
-                                            handleSelectCommit(commitId);
-                                            navigateTo("document", activeIssue.id);
-                                          }}
-                                        >
-                                          <span>View Version</span>
-                                        </Button>
-                                      </div>
-                                      {after && <p className="mt-1">{after.trim()}</p>}
-                                    </div>
-                                  );
-                                }
-                                return comment.content;
-                              })()}
+                              <LinkifiedText text={comment.content} />
                             </div>
                           </div>
                         );

@@ -288,7 +288,12 @@ const openPullRequestTool: TractTool = {
     });
 
     await adminDb.transact(prIds.map((p) => p.tx));
-    return { pullRequestIds: prIds.map((p) => p.prId) };
+    return {
+      pullRequests: prIds.map((p) => ({
+        id: p.prId,
+        url: `${appUrl()}/app/contract/${contractId}?tab=pull-requests&pr=${p.prId}`,
+      })),
+    };
   },
 };
 

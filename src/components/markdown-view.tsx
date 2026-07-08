@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { displayName } from "@/lib/utils";
+import { LinkifiedText } from "@/components/linkified-text";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -240,7 +241,7 @@ export function ProseBlock({
                             </button>
                           )}
                         </div>
-                        <p className="text-foreground/90 whitespace-pre-wrap pl-1" dir="auto">{comment.content}</p>
+                        <p className="text-foreground/90 whitespace-pre-wrap pl-1" dir="auto"><LinkifiedText text={comment.content} /></p>
                       </div>
                     );
                   })}
