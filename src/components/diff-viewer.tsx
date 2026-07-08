@@ -25,6 +25,7 @@ interface DiffViewerProps {
   commits?: any[];
   myParticipant?: any;
   contractName?: string;
+  onCommentClick?: (issueId: string, commentId: string) => void;
 }
 
 function getLineIssues(diff: LineDiff, issues: any[], commitId?: string) {
@@ -76,6 +77,7 @@ export function DiffViewer({
   commits = [],
   myParticipant,
   contractName = "",
+  onCommentClick,
 }: DiffViewerProps) {
   const { user } = db.useAuth();
   const { data: contractData } = db.useQuery({
@@ -428,6 +430,7 @@ export function DiffViewer({
               mentionSuggestions={mentionSuggestions}
               typingIssues={typingIssues}
               onDeleteComment={handleDeleteComment}
+              onCommentClick={onCommentClick}
             />
           ))}
         </div>
@@ -531,6 +534,7 @@ interface DiffLineProps {
   mentionSuggestions: string[];
   typingIssues: { [issueId: string]: boolean };
   onDeleteComment: (commentId: string) => Promise<void>;
+  onCommentClick?: (issueId: string, commentId: string) => void;
 }
 
 function DiffLine({
@@ -556,6 +560,7 @@ function DiffLine({
   mentionSuggestions,
   typingIssues,
   onDeleteComment,
+  onCommentClick,
 }: DiffLineProps) {
   const isUnchanged = diff.type === "unchanged";
   const isAdded = diff.type === "added";
@@ -700,7 +705,14 @@ function DiffLine({
                       ? (comment.creator?.email ? displayName(comment.creator.email) : "Unknown user")
                       : "Tract";
                     return (
-                      <div key={comment.id} className="group/comment space-y-0.5">
+                      <div
+                        key={comment.id}
+                        id={`comment-${comment.id}`}
+                        onClick={() => onCommentClick?.(issue.id, comment.id)}
+                        className={`group/comment space-y-0.5 p-1 rounded transition-all ${
+                          onCommentClick ? "cursor-pointer hover:bg-muted/40" : ""
+                        }`}
+                      >
                         <div className="flex items-center justify-between text-muted-foreground">
                           <div className="flex items-center gap-1 text-[10px]">
                             {isTract && (

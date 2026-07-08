@@ -18,6 +18,7 @@ interface MarkdownViewProps {
   contractId?: string;
   commitId?: string;
   triggerTractReply?: (issueId: string, issueTitle: string, currentComment: string, existingComments: any[]) => Promise<void>;
+  onCommentClick?: (issueId: string, commentId: string) => void;
 }
 
 interface ProseBlockProps {
@@ -28,6 +29,7 @@ interface ProseBlockProps {
   commitId?: string;
   user: any;
   triggerTractReply?: (issueId: string, issueTitle: string, currentComment: string, existingComments: any[]) => Promise<void>;
+  onCommentClick?: (issueId: string, commentId: string) => void;
 }
 
 export function ProseBlock({
@@ -38,6 +40,7 @@ export function ProseBlock({
   commitId,
   user,
   triggerTractReply,
+  onCommentClick,
 }: ProseBlockProps) {
   const [showCommentForm, setShowCommentForm] = useState(false);
   const [newCommentInput, setNewCommentInput] = useState("");
@@ -201,7 +204,14 @@ export function ProseBlock({
                       ? (comment.creator?.email ? displayName(comment.creator.email) : "Unknown user")
                       : "Tract";
                     return (
-                      <div key={comment.id} className="group/comment space-y-0.5">
+                      <div
+                        key={comment.id}
+                        id={`comment-${comment.id}`}
+                        onClick={() => onCommentClick?.(issue.id, comment.id)}
+                        className={`group/comment space-y-0.5 p-1 rounded transition-all ${
+                          onCommentClick ? "cursor-pointer hover:bg-muted/40" : ""
+                        }`}
+                      >
                         <div className="flex items-center justify-between text-muted-foreground">
                           <div className="flex items-center gap-1 text-[10px]">
                             {isTract && (
@@ -308,6 +318,7 @@ export function MarkdownView({
   contractId,
   commitId,
   triggerTractReply,
+  onCommentClick,
 }: MarkdownViewProps) {
   const { user } = db.useAuth();
 
@@ -332,6 +343,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <p {...props} dir="auto">{children}</p>
             </ProseBlock>
@@ -344,6 +356,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <h1 {...props} dir="auto">{children}</h1>
             </ProseBlock>
@@ -356,6 +369,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <h2 {...props} dir="auto">{children}</h2>
             </ProseBlock>
@@ -368,6 +382,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <h3 {...props} dir="auto">{children}</h3>
             </ProseBlock>
@@ -380,6 +395,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <h4 {...props} dir="auto">{children}</h4>
             </ProseBlock>
@@ -392,6 +408,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <h5 {...props} dir="auto">{children}</h5>
             </ProseBlock>
@@ -404,6 +421,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <h6 {...props} dir="auto">{children}</h6>
             </ProseBlock>
@@ -416,6 +434,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <li {...props} dir="auto">{children}</li>
             </ProseBlock>
@@ -428,6 +447,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <ol {...props} dir="auto">{children}</ol>
             </ProseBlock>
@@ -440,6 +460,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <ul {...props} dir="auto">{children}</ul>
             </ProseBlock>
@@ -452,6 +473,7 @@ export function MarkdownView({
               commitId={commitId}
               user={user}
               triggerTractReply={triggerTractReply}
+              onCommentClick={onCommentClick}
             >
               <blockquote {...props} dir="auto">{children}</blockquote>
             </ProseBlock>

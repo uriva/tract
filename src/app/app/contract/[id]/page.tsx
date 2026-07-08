@@ -86,6 +86,80 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [typingIssues, setTypingIssues] = useState<{ [issueId: string]: boolean }>({});
 
+  const navigateTo = useCallback((
+    tab: "document" | "issues" | "pull-requests",
+    issueId: string | null = null,
+    prId: string | null = null,
+    commentId: string | null = null,
+    replace: boolean = false
+  ) => {
+    const params = new URLSearchParams(window.location.search);
+    
+    if (tab === "document") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+
+    if (issueId) {
+      params.set("issue", issueId);
+    } else {
+      params.delete("issue");
+    }
+
+    if (prId) {
+      params.set("pr", prId);
+    } else {
+      params.delete("pr");
+    }
+
+    if (commentId) {
+      params.set("comment", commentId);
+    } else {
+      params.delete("comment");
+    }
+
+    const search = params.toString();
+    const newUrl = `${window.location.pathname}${search ? "?" + search : ""}${window.location.hash}`;
+    
+    if (replace) {
+      window.history.replaceState(null, "", newUrl);
+    } else {
+      window.history.pushState(null, "", newUrl);
+    }
+
+    setActiveTab(tab);
+    setSelectedIssueId(issueId);
+    setActivePullRequestId(prId);
+  }, []);
+
+  // Synchronize state with URL parameters (for history back/forward and direct links)
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab") as "document" | "issues" | "pull-requests" | null;
+      const issueId = params.get("issue");
+      const prId = params.get("pr");
+
+      if (tab) {
+        setActiveTab(tab);
+      } else {
+        setActiveTab("document");
+      }
+
+      setSelectedIssueId(issueId);
+      setActivePullRequestId(prId);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    // Initialize state on mount
+    handlePopState();
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
   async function triggerTractReply(issueId: string, issueTitle: string, currentComment: string, existingComments: any[] = []) {
     setTypingIssues(prev => ({ ...prev, [issueId]: true }));
     try {
@@ -166,7 +240,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
     await db.transact(txs);
     setNewIssueTitle("");
     setNewCommentContent("");
-    setSelectedIssueId(issueId);
+    navigateTo("issues", issueId);
 
     if (/\B@\s*tract\b/i.test(contentText)) {
       triggerTractReply(issueId, titleText, contentText, []);
@@ -350,6 +424,32 @@ function ContractEditor({ contractId }: { contractId: string }) {
   }, [commits, participants, user]);
 
   const [squashing, setSquashing] = useState(false);
+
+  // Scroll to comment when it becomes available in the DOM
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const commentId = params.get("comment");
+    if (!commentId || isLoading) return;
+
+    let attempts = 0;
+    const interval = setInterval(() => {
+      const element = document.getElementById(`comment-${commentId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        element.classList.add("bg-accent/20", "border-accent", "ring-2", "ring-accent/20");
+        setTimeout(() => {
+          element.classList.remove("bg-accent/20", "border-accent", "ring-2", "ring-accent/20");
+        }, 3000);
+        clearInterval(interval);
+      }
+      attempts++;
+      if (attempts > 30) {
+        clearInterval(interval);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isLoading, activeTab, selectedIssueId, activePullRequestId]);
 
   async function handleSquashCommits(tipCommitId: string) {
     if (!user) return;
@@ -687,7 +787,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
           status: "merged",
         }),
       ]);
-      setActivePullRequestId(null);
+      navigateTo("pull-requests", null, null);
       return;
     }
 
@@ -721,7 +821,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
     await db.transact(txs);
 
     if (approvedCount >= totalCount) {
-      setActivePullRequestId(null);
+      navigateTo("pull-requests", null, null);
     }
   }
 
@@ -944,7 +1044,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
       {/* Tabs Switcher */}
       <div className="flex border-b border-border">
         <button
-          onClick={() => setActiveTab("document")}
+          onClick={() => navigateTo("document")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-[2px] ${
             activeTab === "document"
               ? "border-accent text-accent font-semibold"
@@ -954,7 +1054,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
           Document
         </button>
         <button
-          onClick={() => setActiveTab("issues")}
+          onClick={() => navigateTo("issues", selectedIssueId)}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-[2px] ${
             activeTab === "issues"
               ? "border-accent text-accent font-semibold"
@@ -964,10 +1064,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
           Issues & Discussions
         </button>
         <button
-          onClick={() => {
-            setActiveTab("pull-requests");
-            setActivePullRequestId(null);
-          }}
+          onClick={() => navigateTo("pull-requests")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-[2px] ${
             activeTab === "pull-requests"
               ? "border-accent text-accent font-semibold"
@@ -988,7 +1085,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 size="sm"
                 variant="outline"
                 className="text-xs h-7 px-2"
-                onClick={() => setSelectedIssueId(null)}
+                onClick={() => navigateTo("issues", null)}
               >
                 + New
               </Button>
@@ -1006,7 +1103,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                   return (
                     <button
                       key={issue.id}
-                      onClick={() => setSelectedIssueId(issue.id)}
+                      onClick={() => navigateTo("issues", issue.id)}
                       className={`w-full text-left p-3 rounded-lg border text-xs space-y-1 transition-all ${
                         isSelected
                           ? "bg-secondary border-ring/40"
@@ -1031,9 +1128,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
                             onClick={(e) => {
                               e.stopPropagation();
                               if (issue.commit) {
-                                setSelectedIssueId(issue.id);
                                 handleSelectCommit(issue.commit.id);
-                                setActiveTab("document");
+                                navigateTo("document", issue.id);
                               }
                             }}
                             className="underline text-accent hover:text-accent/80 font-semibold cursor-pointer"
@@ -1134,7 +1230,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                             onClick={() => {
                               if (activeIssue.commit) {
                                 handleSelectCommit(activeIssue.commit.id);
-                                setActiveTab("document");
+                                navigateTo("document", activeIssue.id);
                               }
                             }}
                             className="underline text-accent hover:text-accent/80 font-semibold cursor-pointer"
@@ -1231,7 +1327,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                                           className="text-xs h-7 px-2.5 flex items-center gap-1.5"
                                           onClick={() => {
                                             handleSelectCommit(commitId);
-                                            setActiveTab("document");
+                                            navigateTo("document", activeIssue.id);
                                           }}
                                         >
                                           <span>View Version</span>
@@ -1317,7 +1413,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                         variant="ghost"
                         size="sm"
                         className="text-xs text-muted-foreground -ml-2 mb-2"
-                        onClick={() => setActivePullRequestId(null)}
+                        onClick={() => navigateTo("pull-requests", null, null)}
                       >
                         &larr; Back to Pull Requests
                       </Button>
@@ -1340,6 +1436,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     commits={commits}
                     myParticipant={myParticipant}
                     contractName={contract?.name ?? ""}
+                    onCommentClick={(issueId, commentId) => navigateTo("pull-requests", issueId, activePullRequestId, commentId)}
                   />
                   
                   {!isTargetUser && (
@@ -1396,7 +1493,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => setActivePullRequestId(pr.id)}
+                            onClick={() => navigateTo("pull-requests", null, pr.id)}
                           >
                             {isOpen && isTargetMe ? "Review & Merge" : "View Comparison"}
                           </Button>
@@ -1585,9 +1682,8 @@ function ContractEditor({ contractId }: { contractId: string }) {
                         size="sm"
                         className="text-xs"
                         onClick={() => {
-                          setSelectedIssueId(null);
                           setNewIssueTitle(`Discussion on version ${activeCommitId?.slice(0, 7)}`);
-                          setActiveTab("issues");
+                          navigateTo("issues", null);
                         }}
                       >
                         Comment on this version
@@ -1630,6 +1726,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       contractId={contractId}
                       commitId={activeCommit?.id}
                       triggerTractReply={triggerTractReply}
+                      onCommentClick={(issueId, commentId) => navigateTo("document", issueId, null, commentId)}
                     />
                   )}
                 </div>
