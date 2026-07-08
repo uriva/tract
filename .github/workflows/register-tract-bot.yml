@@ -1,0 +1,51 @@
+name: Register Tract Bot
+
+# Keeps the Tract agent on prompt2bot in sync with the deployed code. After a
+# push to main touches the agent's prompt or tools, wait for the Vercel
+# deployment to go live, then re-register the prompt and tools via the deployed
+# /api/tract-agent/register endpoint (which uses the same code as the source of
+# truth). Authenticated with the bot's webhook secret.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/lib/tract-agent/**'
+      - 'src/app/api/tract-tools/**'
+      - 'src/app/api/tract-agent/**'
+      - '.github/workflows/register-tract-bot.yml'
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for deployment and register prompt + tools
+        env:
+          APP_URL: ${{ secrets.TRACT_APP_URL }}
+          PROMPT2BOT_SECRET: ${{ secrets.PROMPT2BOT_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$PROMPT2BOT_SECRET" ]; then
+            echo "TRACT_APP_URL and PROMPT2BOT_SECRET secrets must be set"
+            exit 1
+          fi
+          url="$APP_URL/api/tract-agent/register"
+          echo "Registering via $url"
+          # Poll until the freshly deployed endpoint responds successfully
+          # (gives Vercel time to finish building and aliasing the new deploy).
+          for attempt in $(seq 1 30); do
+            resp=$(curl -s -w "\n%{http_code}" -X POST "$url" \
+              -H "Authorization: Bearer $PROMPT2BOT_SECRET")
+            code=$(echo "$resp" | tail -n1)
+            body=$(echo "$resp" | sed '$d')
+            echo "Attempt $attempt: HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "$body"
+              echo "Tract bot registered."
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Failed to register Tract bot after polling."
+          echo "$body"
+          exit 1
