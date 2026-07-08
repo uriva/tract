@@ -51,20 +51,6 @@ const requirePresent = <T>(value: T | undefined | null, message: string): T => {
   return value;
 };
 
-/**
- * Defense-in-depth: if the agent accidentally routes content through a
- * safescript / code-execution tool, its output is wrapped with a
- * "--- Signature --- ... --- Result ---" preamble. Strip that so it never lands
- * in a commit's content. (The prompt also forbids using those tools.)
- */
-const stripToolSignature = (content: string): string => {
-  if (!content.startsWith("--- Signature ---")) return content;
-  const marker = "--- Result ---";
-  const idx = content.indexOf(marker);
-  if (idx === -1) return content;
-  return content.slice(idx + marker.length).replace(/^\n+/, "");
-};
-
 // --- data shaping helpers -------------------------------------------------
 
 const shapeCommit = (c: CommitWithRefs) => ({
@@ -200,9 +186,7 @@ const createCommitTool: TractTool = {
       params.parentCommitId,
       "parentCommitId is required",
     );
-    const content = stripToolSignature(
-      requireStr(params.content, "content is required"),
-    );
+    const content = requireStr(params.content, "content is required");
     const message = requireStr(params.message, "message is required");
 
     const parentCheck = await adminDb.query({
