@@ -82,7 +82,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
     | null
   >(null);
 
-  const [activeTab, setActiveTab] = useState<"document" | "issues" | "pull-requests">("document");
+  const [activeTab, setActiveTab] = useState<"document" | "issues" | "pull-requests" | "history">("document");
   const [activePullRequestId, setActivePullRequestId] = useState<string | null>(null);
   const [prArchivedExpanded, setPrArchivedExpanded] = useState(false);
   const [newIssueTitle, setNewIssueTitle] = useState("");
@@ -93,7 +93,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [typingIssues, setTypingIssues] = useState<{ [issueId: string]: boolean }>({});
 
   const navigateTo = useCallback((
-    tab: "document" | "issues" | "pull-requests",
+    tab: "document" | "issues" | "pull-requests" | "history",
     issueId: string | null = null,
     prId: string | null = null,
     commentId: string | null = null,
@@ -143,7 +143,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
-      const tab = params.get("tab") as "document" | "issues" | "pull-requests" | null;
+      const tab = params.get("tab") as "document" | "issues" | "pull-requests" | "history" | null;
       const issueId = params.get("issue");
       const prId = params.get("pr");
 
@@ -1053,30 +1053,52 @@ function ContractEditor({ contractId }: { contractId: string }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
-          {editingName ? (
-            <input
-              className="text-xl font-semibold tracking-tight bg-transparent border-b border-accent outline-none w-full"
-              value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
-              onBlur={handleNameSave}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleNameSave();
-                if (e.key === "Escape") setEditingName(false);
-              }}
-              autoFocus
-            />
-          ) : (
-            <h1
-              className="text-xl font-semibold tracking-tight cursor-pointer hover:text-accent transition-colors truncate"
-              onClick={() => {
-                setNameValue(contract.name);
-                setEditingName(true);
-              }}
-              title="Click to rename"
-            >
-              {contract.name}
-            </h1>
-          )}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {editingName ? (
+              <input
+                className="text-xl font-semibold tracking-tight bg-transparent border-b border-accent outline-none w-full"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onBlur={handleNameSave}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleNameSave();
+                  if (e.key === "Escape") setEditingName(false);
+                }}
+                autoFocus
+              />
+            ) : (
+              <h1
+                className="text-xl font-semibold tracking-tight cursor-pointer hover:text-accent transition-colors truncate"
+                onClick={() => {
+                  setNameValue(contract.name);
+                  setEditingName(true);
+                }}
+                title="Click to rename"
+              >
+                {contract.name}
+              </h1>
+            )}
+
+            {/* Top Signature Badges */}
+            {activeCommitSignatures.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {activeCommitSignatures.length >= Math.max(2, uniqueParticipants.length) ? (
+                  <Badge variant="default" className="text-[10px] bg-emerald-600 hover:bg-emerald-600 text-white">
+                    ✓ Fully Signed
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    ✍️ Signed ({activeCommitSignatures.length}/{uniqueParticipants.length})
+                  </Badge>
+                )}
+                {hasMySignatureOnActiveCommit && (
+                  <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                    Signed by you
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground font-mono mt-1">
             {isViewingHistory
               ? `Viewing: ${activeCommitId?.slice(0, 7)} (not your current version)`
@@ -1184,6 +1206,16 @@ function ContractEditor({ contractId }: { contractId: string }) {
           }`}
         >
           Pull Requests
+        </button>
+        <button
+          onClick={() => navigateTo("history")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-[2px] ${
+            activeTab === "history"
+              ? "border-accent text-accent font-semibold"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Version History
         </button>
       </div>
 
@@ -1694,6 +1726,91 @@ function ContractEditor({ contractId }: { contractId: string }) {
             </div>
           )}
         </div>
+      ) : activeTab === "history" ? (
+        <div className="space-y-6 max-w-3xl mx-auto py-2">
+          <div>
+            <h2 className="text-base font-semibold">Version History (Ancestry Path)</h2>
+            <p className="text-xs text-muted-foreground">
+              The direct lineage of edits leading from the initial draft to your currently selected version.
+            </p>
+          </div>
+
+          {versionHistory.length === 0 ? (
+            <div className="text-sm text-muted-foreground italic py-12 text-center">
+              No version history found.
+            </div>
+          ) : (
+            <div className="relative border-l-2 border-border/60 ml-3 pl-6 space-y-6">
+              {versionHistory.map((c) => {
+                const authorLabel = c.author?.email
+                  ? displayName(c.author.email)
+                  : "Tract";
+                const date = new Date(c.createdAt);
+                const isActive = c.id === activeCommitId;
+
+                return (
+                  <div key={c.id} className="relative group">
+                    {/* Timeline dot */}
+                    <span className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-2 bg-background flex items-center justify-center transition-all ${
+                      isActive
+                        ? "border-accent ring-4 ring-accent/10"
+                        : "border-border/80 group-hover:border-muted-foreground/60"
+                    }`}>
+                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
+                    </span>
+
+                    <div className={`p-4 rounded-lg border transition-all ${
+                      isActive
+                        ? "bg-accent/5 border-accent/30 shadow-sm"
+                        : "bg-card border-border hover:border-muted-foreground/30 hover:shadow-sm"
+                    }`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-muted">
+                            {c.id.slice(0, 7)}
+                          </span>
+                          <span className="text-xs font-medium text-foreground" title={c.author?.email || undefined}>
+                            {authorLabel}
+                          </span>
+                          <span className="text-muted-foreground/50 text-[10px]">&bull;</span>
+                          <span className="text-muted-foreground/70 text-[11px]">
+                            {date.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isActive ? (
+                            <Badge variant="outline" className="text-[10px] border-accent/30 text-accent font-semibold">
+                              Currently Viewing
+                            </Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-[11px] h-7 px-2.5"
+                              onClick={() => {
+                                handleSelectCommit(c.id);
+                                navigateTo("document");
+                              }}
+                            >
+                              View this version
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {c.message ? (
+                        <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">{c.message}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">No description provided</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8">
           {/* Main content area */}
@@ -1988,39 +2105,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     </div>
                   )}
                 </div>
-
-                {/* History for this version */}
-                {versionHistory.length > 0 && (
-                  <div className="space-y-2 pt-2">
-                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      History for this version
-                    </h3>
-                    <div className="space-y-1">
-                      {versionHistory.map((c) => {
-                        const authorLabel = c.author?.email
-                          ? displayName(c.author.email)
-                          : "Tract";
-                        const date = new Date(c.createdAt);
-                        return (
-                          <div key={c.id} className="text-xs text-muted-foreground py-1.5 border-b border-border/50 last:border-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-[10px]">{c.id.slice(0, 7)}</span>
-                              <span title={c.author?.email || undefined}>{authorLabel}</span>
-                              <span className="text-muted-foreground/50">·</span>
-                              <span className="text-muted-foreground/50">
-                                {date.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
-                              </span>
-                            </div>
-                            {c.message && (
-                              <p className="mt-0.5 text-foreground/70 whitespace-pre-wrap">{c.message}</p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+                </div>
             )}
           </div>
 
