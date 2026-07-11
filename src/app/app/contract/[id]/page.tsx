@@ -394,6 +394,27 @@ function ContractEditor({ contractId }: { contractId: string }) {
     return s;
   }, [commits]);
 
+  // Build set of deletable commit IDs
+  const deletableCommitIds = useMemo(() => {
+    const s = new Set<string>();
+    if (!user) return s;
+    for (const c of commits) {
+      // Must be a leaf (no children)
+      if (commitsWithChildren.has(c.id)) continue;
+      // Must be authored by user or be a Tract commit (no author)
+      const authorId = c.author?.id;
+      if (authorId && authorId !== user.id) continue;
+      // No other participant may have adopted this commit
+      const othersAdopted = participants.some(
+        (p: any) => p.headCommitId === c.id && p.user?.id !== user.id,
+      );
+      if (othersAdopted) continue;
+      
+      s.add(c.id);
+    }
+    return s;
+  }, [commits, user, commitsWithChildren, participants]);
+
   // Can the user delete the currently viewed commit?
   const canDeleteActiveCommit = useMemo(() => {
     if (!activeCommit || !user) return false;
@@ -535,15 +556,16 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletingCommitId, setDeletingCommitId] = useState<string | null>(null);
 
   async function handleDeleteCommit() {
-    if (!activeCommitId || !user) return;
+    if (!deletingCommitId || !user) return;
     setDeleting(true);
     try {
       const res = await fetch("/api/delete-commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commitId: activeCommitId, userId: user.id }),
+        body: JSON.stringify({ commitId: deletingCommitId, userId: user.id }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -551,6 +573,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
       }
       setDeleteOpen(false);
       setViewingCommitId(null);
+      setDeletingCommitId(null);
     } catch (e) {
       console.error("Delete commit failed:", e);
     } finally {
@@ -1066,11 +1089,6 @@ function ContractEditor({ contractId }: { contractId: string }) {
               View-only (guest)
             </span>
           )}
-          {!isGuest && mode === "view" && !isViewingHistory && (
-            <Button size="sm" variant="outline" onClick={enterEditMode}>
-              Edit
-            </Button>
-          )}
           {mode === "edit" && (
             <Button
               size="sm"
@@ -1103,6 +1121,20 @@ function ContractEditor({ contractId }: { contractId: string }) {
               disabled={tractStatus?.state === "working"}
             >
               Ask Tract
+            </Button>
+          )}
+          {!isGuest && mode === "view" && displayContent.trim() && !hasMySignatureOnActiveCommit && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-accent/40 text-accent hover:bg-accent/10 hover:text-accent font-semibold flex items-center gap-1.5"
+              onClick={() => setVersionSignOpen(true)}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pen-tool">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              Sign this version
             </Button>
           )}
           <Button
@@ -1795,81 +1827,83 @@ function ContractEditor({ contractId }: { contractId: string }) {
                   <CollapsibleSummary text={summary.text} />
                 )}
 
-                {/* Action bar — shown when viewing a historical commit or when the current commit is deletable */}
-                {(isViewingHistory || canDeleteActiveCommit) && (
-                  <div className="space-y-2 p-3 rounded-lg border border-accent/30 bg-accent/5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">
-                        Viewing commit <span className="font-mono">{activeCommitId?.slice(0, 7)}</span>
-                        {activeCommit?.author?.email
-                          ? <> by <span title={activeCommit.author.email}>{displayName(activeCommit.author.email)}</span></>
-                          : " by Tract"}
-                      </p>
+                <div className="relative min-h-[500px] px-8 py-6 rounded-lg border border-border bg-card">
+                  {mode === "view" && displayContent.trim() && (
+                    <div className="absolute top-3 start-3 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      {/* Copy button */}
+                      <button
+                        className="hover:text-foreground transition-colors cursor-pointer"
+                        onClick={() => {
+                          navigator.clipboard.writeText(displayContent);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                      >
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+
+                      <span>&bull;</span>
+
+                      {/* Edit option */}
+                      {!isGuest && !isViewingHistory && (
+                        <>
+                          <button
+                            className="hover:text-foreground transition-colors cursor-pointer font-medium"
+                            onClick={enterEditMode}
+                          >
+                            Edit
+                          </button>
+                          <span>&bull;</span>
+                        </>
+                      )}
+
+                      {/* Adopt version option */}
                       {isViewingHistory && !isGuest && (
-                        <Button size="sm" onClick={() => handleCheckout(activeCommitId!)}>
-                          Adopt this version
-                        </Button>
+                        <>
+                          <button
+                            className="hover:text-foreground transition-colors cursor-pointer font-semibold text-accent"
+                            onClick={() => handleCheckout(activeCommitId!)}
+                          >
+                            Adopt version
+                          </button>
+                          <span>&bull;</span>
+                        </>
                       )}
-                    </div>
-                    {activeCommit?.message && (
-                      <p className="text-xs text-muted-foreground italic">{activeCommit.message}</p>
-                    )}
-                     <div className="flex items-center gap-2 flex-wrap">
+
+                      {/* Compare version option */}
                       {isViewingHistory && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs"
-                          onClick={() => router.push(`/app/contract/${contractId}/compare/${activeCommitId}`)}
-                        >
-                          Compare to my version
-                        </Button>
+                        <>
+                          <button
+                            className="hover:text-foreground transition-colors cursor-pointer"
+                            onClick={() => router.push(`/app/contract/${contractId}/compare/${activeCommitId}`)}
+                          >
+                            Compare to my version
+                          </button>
+                          <span>&bull;</span>
+                        </>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs"
+
+                      {/* View changes from parent */}
+                      <button
+                        className="hover:text-foreground transition-colors cursor-pointer"
                         onClick={() => setCommitDetailOpen(true)}
                       >
                         View changes from parent
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs"
+                      </button>
+
+                      <span>&bull;</span>
+
+                      {/* Comment on this version */}
+                      <button
+                        className="hover:text-foreground transition-colors cursor-pointer"
                         onClick={() => {
                           setNewIssueTitle(`Discussion on version ${activeCommitId?.slice(0, 7)}`);
                           navigateTo("issues", null);
                         }}
                       >
                         Comment on this version
-                      </Button>
-                      {canDeleteActiveCommit && !isGuest && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs text-destructive hover:text-destructive"
-                          onClick={() => setDeleteOpen(true)}
-                        >
-                          Delete this commit
-                        </Button>
-                      )}
+                      </button>
                     </div>
-                  </div>
-                )}
-
-                <div className="relative min-h-[500px] px-8 py-6 rounded-lg border border-border bg-card">
-                  {mode === "view" && displayContent.trim() && (
-                    <button
-                      className="absolute top-3 start-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => {
-                        navigator.clipboard.writeText(displayContent);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
-                      }}
-                    >
-                      {copied ? "Copied" : "Copy"}
-                    </button>
                   )}
                   {!displayContent.trim() ? (
                     <div className="text-sm text-muted-foreground italic py-8 text-center">
@@ -2018,6 +2052,11 @@ function ContractEditor({ contractId }: { contractId: string }) {
               squashableChains={isGuest ? undefined : squashableChains}
               onSquash={handleSquashCommits}
               squashing={squashing}
+              deletableCommitIds={deletableCommitIds}
+              onDeleteCommit={(cid) => {
+                setDeletingCommitId(cid);
+                setDeleteOpen(true);
+              }}
             />
           </div>
         </div>

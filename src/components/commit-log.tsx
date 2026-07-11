@@ -5,6 +5,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { displayName } from "@/lib/utils";
 import { buildLayout } from "@/lib/commit-layout";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 interface Commit {
   id: string;
@@ -36,6 +43,8 @@ interface CommitLogProps {
   squashableChains?: Map<string, string[]>;
   onSquash?: (tipCommitId: string) => void;
   squashing?: boolean;
+  deletableCommitIds?: Set<string>;
+  onDeleteCommit?: (commitId: string) => void;
 }
 
 export function CommitLog({
@@ -50,6 +59,8 @@ export function CommitLog({
   squashableChains,
   onSquash,
   squashing,
+  deletableCommitIds,
+  onDeleteCommit,
 }: CommitLogProps) {
   const layout = useMemo(() => buildLayout(commits), [commits]);
   const maxLane = useMemo(
@@ -210,12 +221,13 @@ export function CommitLog({
             const authorLabel = isTract ? "Tract" : displayName(commit.author?.email, commit.author?.id);
             const onThisCommit = commitParticipants.get(commit.id) ?? [];
             const squashChain = squashableChains?.get(commit.id);
+            const isDeletable = deletableCommitIds?.has(commit.id);
 
             return (
-              <div key={commit.id}>
+              <div key={commit.id} className="group/commit-item relative">
               <button
                 onClick={() => onSelectCommit?.(commit.id)}
-                className={`absolute right-0 text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
+                className={`absolute right-0 text-left px-2 pr-8 py-1.5 rounded-md text-sm transition-colors ${
                   isViewing
                     ? "bg-secondary border border-ring/30"
                     : "hover:bg-secondary/50 border border-transparent"
@@ -270,6 +282,38 @@ export function CommitLog({
                   <span title={commit.author?.email || undefined}>{authorLabel}</span> &middot; {getTimeAgo(commit.createdAt)}
                 </div>
               </button>
+              {isDeletable && onDeleteCommit && (
+                <div
+                  className="absolute z-10 opacity-0 group-hover/commit-item:opacity-100 focus-within:opacity-100 transition-opacity"
+                  style={{
+                    top: row * ROW_H + 8,
+                    right: 8,
+                  }}
+                >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-md hover:bg-muted p-0 shrink-0 flex items-center justify-center"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    } />
+                    <DropdownMenuContent align="end" className="w-36">
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteCommit(commit.id);
+                        }}
+                      >
+                        Delete commit
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
               {squashChain && onSquash && (
                 <button
                   type="button"
