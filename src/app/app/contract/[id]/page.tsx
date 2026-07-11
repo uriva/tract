@@ -87,6 +87,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [newCommentContent, setNewCommentContent] = useState("");
   const [replyContents, setReplyContents] = useState<{ [issueId: string]: string }>({});
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [issueFilter, setIssueFilter] = useState<"active" | "closed">("active");
   const [typingIssues, setTypingIssues] = useState<{ [issueId: string]: boolean }>({});
 
   const navigateTo = useCallback((
@@ -1104,14 +1105,52 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 + New
               </Button>
             </div>
+
+            {(() => {
+              const issues = contract?.issues ?? [];
+              const activeIssues = issues.filter((i: any) => i.status !== "closed");
+              const closedIssues = issues.filter((i: any) => i.status === "closed");
+              return (
+                <div className="flex bg-muted p-1 rounded-md text-xs">
+                  <button
+                    onClick={() => setIssueFilter("active")}
+                    className={`flex-1 py-1 rounded text-center font-medium transition-colors cursor-pointer ${
+                      issueFilter === "active"
+                        ? "bg-background text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Active ({activeIssues.length})
+                  </button>
+                  <button
+                    onClick={() => setIssueFilter("closed")}
+                    className={`flex-1 py-1 rounded text-center font-medium transition-colors cursor-pointer ${
+                      issueFilter === "closed"
+                        ? "bg-background text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Archived ({closedIssues.length})
+                  </button>
+                </div>
+              );
+            })()}
+
             <div className="space-y-2">
               {(() => {
                 const issues = contract?.issues ?? [];
-                const sorted = [...issues].sort((a: any, b: any) => b.createdAt - a.createdAt);
-                if (sorted.length === 0) {
-                  return <p className="text-xs text-muted-foreground italic">No issues started yet.</p>;
+                const filtered = [...issues]
+                  .filter((issue: any) => issueFilter === "active" ? issue.status !== "closed" : issue.status === "closed")
+                  .sort((a: any, b: any) => b.createdAt - a.createdAt);
+
+                if (filtered.length === 0) {
+                  return (
+                    <p className="text-xs text-muted-foreground italic py-8 text-center">
+                      No {issueFilter === "active" ? "active" : "archived"} issues.
+                    </p>
+                  );
                 }
-                return sorted.map((issue: any) => {
+                return filtered.map((issue: any) => {
                   const isSelected = selectedIssueId === issue.id;
                   const isClosed = issue.status === "closed";
                   return (
@@ -1126,7 +1165,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     >
                       <div className="flex items-center justify-between">
                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
-                          isClosed ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                          isClosed ? "bg-slate-500/10 text-slate-500 dark:text-slate-400" : "bg-green-500/10 text-green-500"
                         }`}>
                           {isClosed ? "Closed" : "Active"}
                         </span>
@@ -1228,7 +1267,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                          isClosed ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                          isClosed ? "bg-slate-500/10 text-slate-500 dark:text-slate-400" : "bg-green-500/10 text-green-500"
                         }`}>
                           {isClosed ? "Closed" : "Active"}
                         </span>

@@ -50,7 +50,7 @@ export function ProseBlock({
   const lineIssues = useMemo(() => {
     if (lineNumber === undefined) return [];
     return issues.filter(
-      (issue) => issue.lineNumber === lineNumber
+      (issue) => issue.lineNumber === lineNumber && issue.status !== "closed"
     );
   }, [issues, lineNumber]);
 
@@ -186,7 +186,7 @@ export function ProseBlock({
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground border-b border-border/40 pb-1.5">
                   <div className="flex items-center gap-1.5">
                     <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-medium ${
-                      isClosed ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                      isClosed ? "bg-slate-500/10 text-slate-500 dark:text-slate-400" : "bg-green-500/10 text-green-500"
                     }`}>
                       {isClosed ? "Closed" : "Active"}
                     </span>

@@ -532,7 +532,7 @@ function CompareView({
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                                isClosed ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                                isClosed ? "bg-slate-500/10 text-slate-500 dark:text-slate-400" : "bg-green-500/10 text-green-500"
                               }`}>
                                 {isClosed ? "Closed" : "Active"}
                               </span>
