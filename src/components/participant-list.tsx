@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -22,6 +22,13 @@ interface Participant {
   email?: string;
   headCommitId?: string;
   user?: { id: string; email?: string };
+  closedCommitIds?: string;
+}
+
+interface ClassifiedParticipant extends Participant {
+  status: "agreement" | "has-notes" | "yet-to-approve" | "diverged" | "unknown";
+  conflictCount: number;
+  isClosed: boolean;
 }
 
 interface Commit {
@@ -55,6 +62,7 @@ export function ParticipantList({
   colorMap,
 }: ParticipantListProps) {
   const [removingParticipant, setRemovingParticipant] = useState<Participant | null>(null);
+  const [archivedExpanded, setArchivedExpanded] = useState(false);
 
   const me = participants.find(
     (p) => p.user?.id === currentUserId
@@ -65,20 +73,94 @@ export function ParticipantList({
 
   const commitMap = new Map(commits.map((c) => [c.id, c]));
 
-  // Walk ancestors of a commit to build a set of all ancestor IDs
-  function ancestors(commitId: string): Set<string> {
-    const visited = new Set<string>();
-    let cur = commitId;
-    while (cur) {
-      visited.add(cur);
-      const parent = commitMap.get(cur)?.parent?.id;
-      if (!parent || visited.has(parent)) break;
-      cur = parent;
-    }
-    return visited;
-  }
+  const { activeOthers, archivedOthers } = useMemo(() => {
+    const active: ClassifiedParticipant[] = [];
+    const archived: ClassifiedParticipant[] = [];
 
-  const myAncestors = myHeadCommitId ? ancestors(myHeadCommitId) : new Set<string>();
+    // Walk ancestors of a commit to build a set of all ancestor IDs
+    function ancestors(commitId: string): Set<string> {
+      const visited = new Set<string>();
+      let cur = commitId;
+      while (cur) {
+        visited.add(cur);
+        const parent = commitMap.get(cur)?.parent?.id;
+        if (!parent || visited.has(parent)) break;
+        cur = parent;
+      }
+      return visited;
+    }
+
+    const myAncestors = myHeadCommitId ? ancestors(myHeadCommitId) : new Set<string>();
+
+    const closedIds = (() => {
+      try {
+        return JSON.parse(me?.closedCommitIds || "[]") as string[];
+      } catch (e) {
+        return [] as string[];
+      }
+    })();
+
+    others.forEach((p) => {
+      const theirHead = p.headCommitId;
+      const sameCommit = myHeadCommitId && theirHead && myHeadCommitId === theirHead;
+
+      // Determine relationship by walking the DAG
+      let status: "agreement" | "has-notes" | "yet-to-approve" | "diverged" | "unknown" = "unknown";
+      let conflictCount = 0;
+      if (sameCommit) {
+        status = "agreement";
+      } else if (myHeadCommitId && theirHead) {
+        const theirAncestors = ancestors(theirHead);
+        const theyDescendFromMe = theirAncestors.has(myHeadCommitId);
+        const iDescendFromThem = myAncestors.has(theirHead);
+
+        if (theyDescendFromMe) {
+          status = "has-notes"; // they're ahead of me
+        } else if (iDescendFromThem) {
+          status = "yet-to-approve"; // they're behind me
+        } else {
+          status = "diverged"; // parallel branches
+        }
+
+        if (status === "diverged" || status === "has-notes") {
+          const myCommit = commitMap.get(myHeadCommitId);
+          const theirCommit = commitMap.get(theirHead);
+          if (myCommit?.content !== undefined && theirCommit?.content !== undefined) {
+            const { diffs } = computeLineDiffs(myCommit.content, theirCommit.content);
+            let hunks = 0;
+            let inHunk = false;
+            for (const d of diffs) {
+              if (d.type !== "unchanged") {
+                if (!inHunk) {
+                  hunks++;
+                  inHunk = true;
+                }
+              } else {
+                inHunk = false;
+              }
+            }
+            conflictCount = hunks;
+          }
+        }
+      }
+
+      const isClosed = theirHead ? closedIds.includes(theirHead) : false;
+      const info: ClassifiedParticipant = {
+        ...p,
+        status,
+        conflictCount,
+        isClosed,
+      };
+
+      if (status === "agreement" || isClosed) {
+        archived.push(info);
+      } else {
+        active.push(info);
+      }
+    });
+
+    return { activeOthers: active, archivedOthers: archived };
+  }, [others, myHeadCommitId, me, commits, commitMap]);
 
   return (
     <div className="space-y-3">
@@ -106,50 +188,8 @@ export function ParticipantList({
 
       {others.length > 0 && <Separator />}
 
-      {others.map((p) => {
-        const theirHead = p.headCommitId;
-        const sameCommit = myHeadCommitId && theirHead && myHeadCommitId === theirHead;
-
-        // Determine relationship by walking the DAG
-        let status: "agreement" | "has-notes" | "yet-to-approve" | "diverged" | "unknown" = "unknown";
-        let conflictCount = 0;
-        if (sameCommit) {
-          status = "agreement";
-        } else if (myHeadCommitId && theirHead) {
-          const theirAncestors = ancestors(theirHead);
-          const theyDescendFromMe = theirAncestors.has(myHeadCommitId);
-          const iDescendFromThem = myAncestors.has(theirHead);
-
-          if (theyDescendFromMe) {
-            status = "has-notes"; // they're ahead of me
-          } else if (iDescendFromThem) {
-            status = "yet-to-approve"; // they're behind me
-          } else {
-            status = "diverged"; // parallel branches
-          }
-
-          if (status === "diverged" || status === "has-notes") {
-            const myCommit = commitMap.get(myHeadCommitId);
-            const theirCommit = commitMap.get(theirHead);
-            if (myCommit?.content !== undefined && theirCommit?.content !== undefined) {
-              const { diffs } = computeLineDiffs(myCommit.content, theirCommit.content);
-              let hunks = 0;
-              let inHunk = false;
-              for (const d of diffs) {
-                if (d.type !== "unchanged") {
-                  if (!inHunk) {
-                    hunks++;
-                    inHunk = true;
-                  }
-                } else {
-                  inHunk = false;
-                }
-              }
-              conflictCount = hunks;
-            }
-          }
-        }
-
+      {activeOthers.map((p) => {
+        const { status, conflictCount } = p;
         return (
           <div key={p.id} className="group flex flex-col gap-1 py-1">
             <div className="flex items-center gap-2 min-w-0">
@@ -188,10 +228,6 @@ export function ParticipantList({
                 <span className="text-[10px] text-muted-foreground whitespace-nowrap">yet to approve</span>
               )}
 
-              {status === "agreement" && (
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap">in agreement</span>
-              )}
-
               {isOwner && onRemove && (
                 <button
                   onClick={() => setRemovingParticipant(p)}
@@ -211,6 +247,68 @@ export function ParticipantList({
 
       {others.length === 0 && (
         <p className="text-xs text-muted-foreground">No other participants yet.</p>
+      )}
+
+      {archivedOthers.length > 0 && (
+        <div className="space-y-2 mt-4 pt-2 border-t border-border/40">
+          <button
+            onClick={() => setArchivedExpanded(!archivedExpanded)}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-full text-left"
+          >
+            <span>{archivedExpanded ? "▼" : "▶"} Archived ({archivedOthers.length})</span>
+          </button>
+
+          {archivedExpanded && (
+            <div className="space-y-3 pl-1">
+              {archivedOthers.map((p) => {
+                const { status, isClosed } = p;
+                return (
+                  <div key={p.id} className="group flex flex-col gap-1 py-1 opacity-75">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: colorMap?.get(p.id) ?? "var(--color-muted-foreground)" }}
+                      />
+                      <span
+                        className={`text-sm truncate min-w-0 flex-1 ${p.headCommitId && onSelectVersion ? "cursor-pointer hover:text-accent transition-colors" : ""}`}
+                        title={p.email || undefined}
+                        onClick={() => p.headCommitId && onSelectVersion?.(p.headCommitId)}
+                      >{displayName(p.email, p.user?.id)}</span>
+                      <Badge variant="secondary" className="text-[10px] shrink-0">
+                        {p.role}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0 pl-4">
+                      {isClosed ? (
+                        <Link href={`/app/contract/${contractId}/compare/${p.id}`}>
+                          <Button variant="outline" size="sm" className="text-xs h-7 whitespace-nowrap border-muted text-muted-foreground hover:bg-secondary">
+                            Closed PR
+                          </Button>
+                        </Link>
+                      ) : status === "agreement" ? (
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">merged</span>
+                      ) : null}
+
+                      {isOwner && onRemove && (
+                        <button
+                          onClick={() => setRemovingParticipant(p)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive ml-1 cursor-pointer"
+                          title={`Remove ${displayName(p.email, p.user?.id)}`}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       <Dialog open={!!removingParticipant} onOpenChange={(open) => !open && setRemovingParticipant(null)}>

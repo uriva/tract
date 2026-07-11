@@ -67,6 +67,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
   const [tractOpen, setTractOpen] = useState(false);
   const [commitDetailOpen, setCommitDetailOpen] = useState(false);
   const [signOpen, setSignOpen] = useState(false);
+  const [versionSignOpen, setVersionSignOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -83,6 +84,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
 
   const [activeTab, setActiveTab] = useState<"document" | "issues" | "pull-requests">("document");
   const [activePullRequestId, setActivePullRequestId] = useState<string | null>(null);
+  const [prArchivedExpanded, setPrArchivedExpanded] = useState(false);
   const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newCommentContent, setNewCommentContent] = useState("");
   const [replyContents, setReplyContents] = useState<{ [issueId: string]: string }>({});
@@ -335,6 +337,10 @@ function ContractEditor({ contractId }: { contractId: string }) {
         },
         requester: {},
       },
+      signatures: {
+        creator: {},
+        commit: {},
+      },
       $: { where: { id: contractId } },
     },
   });
@@ -367,6 +373,17 @@ function ContractEditor({ contractId }: { contractId: string }) {
     ? commits.find((c) => c.id === activeCommit.parent!.id) ?? null
     : null;
   const isViewingHistory = viewingCommitId !== null && viewingCommitId !== myHeadCommitId;
+
+  const activeCommitSignatures = useMemo(() => {
+    if (!activeCommitId) return [];
+    return (contract?.signatures ?? []).filter(
+      (sig: any) => sig.commit?.id === activeCommitId
+    );
+  }, [contract?.signatures, activeCommitId]);
+
+  const hasMySignatureOnActiveCommit = useMemo(() => {
+    return activeCommitSignatures.some((sig: any) => sig.creator?.id === user?.id);
+  }, [activeCommitSignatures, user?.id]);
 
   // Build set of commits that have children (used for delete eligibility)
   const commitsWithChildren = useMemo(() => {
@@ -840,6 +857,19 @@ function ContractEditor({ contractId }: { contractId: string }) {
     }
   }
 
+  async function handlePRClose() {
+    if (!activePullRequestId || !contract) return;
+    const activePR = contract.pullRequests?.find((p: any) => p.id === activePullRequestId);
+    if (!activePR) return;
+
+    await db.transact([
+      db.tx.pullRequests[activePR.id].update({
+        status: "closed",
+      }),
+    ]);
+    navigateTo("pull-requests", null, null);
+  }
+
   // Sign this contract (save legal name + drawn signature for PDF)
   async function handleSign(legalName: string, signatureData: string) {
     if (!myParticipant) return;
@@ -857,6 +887,24 @@ function ContractEditor({ contractId }: { contractId: string }) {
     }
   }
 
+  async function handleVersionSign(legalName: string, signatureData: string) {
+    if (!user || !contractId || !activeCommitId) return;
+    if (hasMySignatureOnActiveCommit) return;
+
+    const signatureId = id();
+    await db.transact([
+      db.tx.signatures[signatureId]
+        .update({
+          legalName,
+          signatureData,
+          createdAt: Date.now(),
+        })
+        .link({ commit: activeCommitId })
+        .link({ contract: contractId })
+        .link({ creator: user.id }),
+    ]);
+  }
+
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [includeSignature, setIncludeSignature] = useState(true);
   const pendingDownload = useRef(false);
@@ -867,13 +915,30 @@ function ContractEditor({ contractId }: { contractId: string }) {
     const withSig = includeSignature;
     const sigName = legalName ?? myParticipant?.legalName;
     const sigData = signatureData ?? myParticipant?.signatureData;
+
+    const activeSigs = (contract?.signatures ?? []).filter(
+      (sig: any) => sig.commit?.id === activeCommitId
+    );
+
+    const pdfSignatures = activeSigs.length > 0
+      ? activeSigs.map((sig: any) => ({
+          legalName: sig.legalName,
+          signatureData: sig.signatureData,
+          signedAt: sig.createdAt,
+        }))
+      : (withSig && sigName && sigData ? [{
+          legalName: sigName,
+          signatureData: sigData,
+          signedAt: myParticipant?.signedAt ?? Date.now(),
+        }] : undefined);
+
     fetch("/api/pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: contract.name,
         content: displayContent,
-        signature: withSig && sigName && sigData ? { legalName: sigName, signatureData: sigData, signedAt: myParticipant?.signedAt ?? Date.now() } : undefined,
+        signatures: pdfSignatures,
       }),
     })
       .then((res) => {
@@ -1440,6 +1505,16 @@ function ContractEditor({ contractId }: { contractId: string }) {
                         Proposal from {activePR.requester?.email ? displayName(activePR.requester.email) : "Tract"} to merge changes into {targetParticipant?.email ? displayName(targetParticipant.email) : "their version"}
                       </p>
                     </div>
+                    {isTargetUser && activePR.status === "open" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive text-xs"
+                        onClick={handlePRClose}
+                      >
+                        Close Pull Request
+                      </Button>
+                    )}
                   </div>
                   
                   <DiffViewer
@@ -1474,53 +1549,116 @@ function ContractEditor({ contractId }: { contractId: string }) {
                 </div>
               </div>
               
-              {(!contract?.pullRequests || contract.pullRequests.length === 0) ? (
-                <div className="text-sm text-muted-foreground italic py-12 text-center">
-                  No pull requests yet.
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {contract.pullRequests.map((pr: any) => {
-                    const isOpen = pr.status === "open";
-                    const isTargetMe = pr.targetParticipant?.user?.id === user?.id;
-                    const requesterName = pr.requester?.email ? displayName(pr.requester.email) : "Tract";
-                    const targetName = pr.targetParticipant?.user?.id === user?.id ? "Your version" : (pr.targetParticipant?.email ? displayName(pr.targetParticipant.email) : "unknown");
-                    
-                    return (
-                      <div key={pr.id} className="p-4 rounded-lg border border-border bg-card flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-medium ${
-                              isOpen ? "bg-green-500/10 text-green-500" : "bg-blue-500/10 text-blue-500"
-                            }`}>
-                              {isOpen ? "Open" : "Merged"}
-                            </span>
-                            <span className="font-semibold text-sm text-foreground">
-                              {pr.message || "Pull Request"}
-                            </span>
-                          </div>
-                          <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span>Requested by <strong className="text-foreground">{requesterName}</strong></span>
-                            <span>&bull;</span>
-                            <span>Target: <strong className="text-foreground">{targetName}</strong></span>
-                            <span>&bull;</span>
-                            <span>{new Date(pr.createdAt).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => navigateTo("pull-requests", null, pr.id)}
-                          >
-                            {isOpen && isTargetMe ? "Review & Merge" : "View Comparison"}
-                          </Button>
-                        </div>
+              {(() => {
+                const prs = contract?.pullRequests ?? [];
+                const activePRs = prs.filter((pr: any) => pr.status === "open");
+                const archivedPRs = prs.filter((pr: any) => pr.status === "merged" || pr.status === "closed");
+
+                return (
+                  <>
+                    {activePRs.length === 0 ? (
+                      <div className="text-sm text-muted-foreground italic py-8 text-center border rounded-lg bg-card/10">
+                        No active pull requests.
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    ) : (
+                      <div className="grid gap-3">
+                        {activePRs.map((pr: any) => {
+                          const isOpen = pr.status === "open";
+                          const isTargetMe = pr.targetParticipant?.user?.id === user?.id;
+                          const requesterName = pr.requester?.email ? displayName(pr.requester.email) : "Tract";
+                          const targetName = pr.targetParticipant?.user?.id === user?.id ? "Your version" : (pr.targetParticipant?.email ? displayName(pr.targetParticipant.email) : "unknown");
+                          
+                          return (
+                            <div key={pr.id} className="p-4 rounded-lg border border-border bg-card flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded-full font-medium bg-green-500/10 text-green-500">
+                                    Open
+                                  </span>
+                                  <span className="font-semibold text-sm text-foreground">
+                                    {pr.message || "Pull Request"}
+                                  </span>
+                                </div>
+                                <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span>Requested by <strong className="text-foreground">{requesterName}</strong></span>
+                                  <span>&bull;</span>
+                                  <span>Target: <strong className="text-foreground">{targetName}</strong></span>
+                                  <span>&bull;</span>
+                                  <span>{new Date(pr.createdAt).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => navigateTo("pull-requests", null, pr.id)}
+                                >
+                                  {isTargetMe ? "Review & Merge" : "View Comparison"}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {archivedPRs.length > 0 && (
+                      <div className="space-y-3 pt-4 border-t border-border/40 mt-6">
+                        <button
+                          onClick={() => setPrArchivedExpanded(!prArchivedExpanded)}
+                          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-full text-left"
+                        >
+                          <span>{prArchivedExpanded ? "▼" : "▶"} Archived Pull Requests ({archivedPRs.length})</span>
+                        </button>
+
+                        {prArchivedExpanded && (
+                          <div className="grid gap-3 mt-2 pl-1">
+                            {archivedPRs.map((pr: any) => {
+                              const isMerged = pr.status === "merged";
+                              const isClosed = pr.status === "closed";
+                              const requesterName = pr.requester?.email ? displayName(pr.requester.email) : "Tract";
+                              const targetName = pr.targetParticipant?.user?.id === user?.id ? "Your version" : (pr.targetParticipant?.email ? displayName(pr.targetParticipant.email) : "unknown");
+
+                              return (
+                                <div key={pr.id} className="p-4 rounded-lg border border-border bg-card/60 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs opacity-80">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-medium ${
+                                        isMerged ? "bg-blue-500/10 text-blue-500" : "bg-red-500/10 text-red-500"
+                                      }`}>
+                                        {isMerged ? "Merged" : "Closed"}
+                                      </span>
+                                      <span className="font-semibold text-sm text-foreground">
+                                        {pr.message || "Pull Request"}
+                                      </span>
+                                    </div>
+                                    <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                                      <span>Requested by <strong className="text-foreground">{requesterName}</strong></span>
+                                      <span>&bull;</span>
+                                      <span>Target: <strong className="text-foreground">{targetName}</strong></span>
+                                      <span>&bull;</span>
+                                      <span>{new Date(pr.createdAt).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => navigateTo("pull-requests", null, pr.id)}
+                                    >
+                                      View Comparison
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -1747,6 +1885,74 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       onCommentClick={(issueId, commentId) => navigateTo("document", issueId, null, commentId)}
                     />
                   )}
+
+                  {/* Signatures on this version */}
+                  {mode === "view" && displayContent.trim() && (
+                    <div className="mt-8 pt-6 border-t border-border/60">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Signatures on this version
+                        </h4>
+                        {!hasMySignatureOnActiveCommit && !isGuest && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs h-7 px-3 flex items-center gap-1.5"
+                            onClick={() => setVersionSignOpen(true)}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pen-tool">
+                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                              <path d="m9 12 2 2 4-4" />
+                            </svg>
+                            Sign this version
+                          </Button>
+                        )}
+                      </div>
+
+                      {activeCommitSignatures.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
+                          {activeCommitSignatures.map((sig: any) => {
+                            const isMe = sig.creator?.id === user?.id;
+                            const email = sig.creator?.email ? displayName(sig.creator.email) : "Unknown signer";
+                            return (
+                              <div key={sig.id} className="p-3 rounded-lg border border-border/80 bg-muted/10 relative">
+                                {sig.signatureData.startsWith("data:image/png;base64,") && (
+                                  <img
+                                    src={sig.signatureData}
+                                    alt={`Signature of ${sig.legalName}`}
+                                    className="h-16 object-contain bg-white rounded border p-1"
+                                  />
+                                )}
+                                <div className="mt-2 text-xs font-semibold">{sig.legalName}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  Signed by {isMe ? "You" : email} on {new Date(sig.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic mt-2">No signatures on this version yet.</p>
+                      )}
+
+                      {/* Advice for co-signers */}
+                      {activeCommitSignatures.length >= 2 && (
+                        <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-xs text-green-700 dark:text-green-400 flex items-start gap-2">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+                            <rect width="20" height="16" x="2" y="4" rx="2" />
+                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                          </svg>
+                          <div>
+                            <span className="font-semibold">🎉 Version Fully Signed!</span> Both parties have signed this exact version.
+                            When you download the PDF, both signatures will be included side-by-side.
+                            <p className="mt-1 font-medium text-green-600 dark:text-green-300">
+                              Advise signers to also send it to each other via email for record keeping.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* History for this version */}
@@ -1875,6 +2081,13 @@ function ContractEditor({ contractId }: { contractId: string }) {
         open={signOpen}
         onOpenChange={setSignOpen}
         onSign={handleSign}
+        existingName={myParticipant?.legalName ?? undefined}
+      />
+
+      <SignDialog
+        open={versionSignOpen}
+        onOpenChange={setVersionSignOpen}
+        onSign={handleVersionSign}
         existingName={myParticipant?.legalName ?? undefined}
       />
 

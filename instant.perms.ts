@@ -59,6 +59,14 @@ export default {
       delete: "auth.id in data.ref('contract.participants.user.id')",
     },
   },
+  signatures: {
+    allow: {
+      view: "auth.id in data.ref('contract.participants.user.id')",
+      create: "auth.id != null",
+      update: "false",
+      delete: "false",
+    },
+  },
   $users: {
     allow: {
       view: "auth.id != null",

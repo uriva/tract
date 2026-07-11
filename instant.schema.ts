@@ -25,6 +25,7 @@ const _schema = i.schema({
       signatureData: i.string().optional(), // base64 PNG from canvas
       signedAt: i.number().optional(),
       inviteType: i.string().optional(), // "one-time" | "unlimited"
+      closedCommitIds: i.string().optional(),
     }),
     issues: i.entity({
       title: i.string(),
@@ -41,6 +42,11 @@ const _schema = i.schema({
       status: i.string(), // "open" | "merged"
       createdAt: i.number().indexed(),
       message: i.string().optional(),
+    }),
+    signatures: i.entity({
+      legalName: i.string(),
+      signatureData: i.string(), // base64 PNG from canvas
+      createdAt: i.number().indexed(),
     }),
   },
   links: {
@@ -229,6 +235,44 @@ const _schema = i.schema({
         on: "$users",
         has: "many",
         label: "requestedPullRequests",
+      },
+    },
+    signatureCommit: {
+      forward: {
+        on: "signatures",
+        has: "one",
+        label: "commit",
+        onDelete: "cascade",
+      },
+      reverse: {
+        on: "commits",
+        has: "many",
+        label: "signatures",
+      },
+    },
+    signatureCreator: {
+      forward: {
+        on: "signatures",
+        has: "one",
+        label: "creator",
+      },
+      reverse: {
+        on: "$users",
+        has: "many",
+        label: "signatures",
+      },
+    },
+    signatureContract: {
+      forward: {
+        on: "signatures",
+        has: "one",
+        label: "contract",
+        onDelete: "cascade",
+      },
+      reverse: {
+        on: "contracts",
+        has: "many",
+        label: "signatures",
       },
     },
   },

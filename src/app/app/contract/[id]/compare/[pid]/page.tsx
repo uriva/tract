@@ -7,6 +7,7 @@ import { LinkifiedText } from "@/components/linkified-text";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MentionInput, MentionTextarea } from "@/components/mention-input";
 import { AuthGate } from "@/components/auth-gate";
@@ -343,6 +344,37 @@ function CompareView({
     }
   }
 
+  const closedCommitIds = useMemo(() => {
+    try {
+      return JSON.parse(myParticipant?.closedCommitIds || "[]") as string[];
+    } catch (e) {
+      return [] as string[];
+    }
+  }, [myParticipant?.closedCommitIds]);
+
+  const isClosed = theirHead ? closedCommitIds.includes(theirHead.id) : false;
+
+  async function handleClosePR() {
+    if (!myParticipant || !theirHead) return;
+    const newClosed = Array.from(new Set([...closedCommitIds, theirHead.id]));
+    await db.transact([
+      db.tx.participants[myParticipant.id].update({
+        closedCommitIds: JSON.stringify(newClosed),
+      }),
+    ]);
+    router.push(`/app/contract/${contractId}`);
+  }
+
+  async function handleReopenPR() {
+    if (!myParticipant || !theirHead) return;
+    const newClosed = closedCommitIds.filter((id) => id !== theirHead.id);
+    await db.transact([
+      db.tx.participants[myParticipant.id].update({
+        closedCommitIds: JSON.stringify(newClosed),
+      }),
+    ]);
+  }
+
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading...</div>;
   }
@@ -411,6 +443,31 @@ function CompareView({
             Your version vs. <span title={theirParticipant.email || undefined}>{displayName(theirParticipant.email, theirParticipant.user?.id)}</span>&apos;s version
           </p>
         </div>
+        {theirHead && (
+          <div className="flex items-center gap-2">
+            {isClosed ? (
+              <>
+                <Badge variant="destructive" className="bg-red-500/15 text-red-500 border-none">Closed</Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReopenPR}
+                >
+                  Reopen pull request
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive"
+                onClick={handleClosePR}
+              >
+                Close without merging
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Version info */}

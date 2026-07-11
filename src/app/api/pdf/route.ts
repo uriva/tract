@@ -127,10 +127,11 @@ type Signature = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, content, signature } = (await req.json()) as {
+    const { title, content, signature, signatures } = (await req.json()) as {
       title: string;
       content: string;
       signature?: Signature;
+      signatures?: Signature[];
     };
     if (!content) {
       return NextResponse.json({ error: "Missing content" }, { status: 400 });
@@ -392,8 +393,15 @@ export async function POST(req: NextRequest) {
 
     renderTokens(tokens);
 
-    // Signature block
-    if (signature) {
+    // Signatures block
+    const sigList: Signature[] = [];
+    if (signatures && Array.isArray(signatures)) {
+      sigList.push(...signatures);
+    } else if (signature) {
+      sigList.push(signature);
+    }
+
+    if (sigList.length > 0) {
       doc.moveDown(2);
       const sigRuleY = doc.y;
       doc
@@ -404,25 +412,39 @@ export async function POST(req: NextRequest) {
         .stroke();
       doc.moveDown(0.8);
 
-      if (signature.signatureData.startsWith("data:image/png;base64,")) {
-        const base64 = signature.signatureData.replace(
-          /^data:image\/png;base64,/,
-          "",
+      const startY = doc.y;
+      let maxY = startY;
+
+      sigList.forEach((sig, index) => {
+        doc.y = startY;
+        const colX = index === 0 ? 60 : 300;
+
+        if (sig.signatureData.startsWith("data:image/png;base64,")) {
+          const base64 = sig.signatureData.replace(
+            /^data:image\/png;base64,/,
+            "",
+          );
+          const imgBuf = Buffer.from(base64, "base64");
+          doc.image(imgBuf, colX, doc.y, { width: 200, height: 80 });
+          doc.y += 80;
+          doc.moveDown(0.3);
+        }
+
+        doc.font(FONT_BOLD).fontSize(12).fillColor(COLOR_TEXT);
+        const visualName = hasHebrew(sig.legalName) ? toVisual(sig.legalName, baseDir(sig.legalName)) : sig.legalName;
+        doc.text(visualName, colX, doc.y, { width: 200, align: "left" });
+        doc.moveDown(0.15);
+
+        const signedDate = new Date(sig.signedAt).toLocaleDateString(
+          "en-US",
+          { year: "numeric", month: "long", day: "numeric" },
         );
-        const imgBuf = Buffer.from(base64, "base64");
-        doc.image(imgBuf, 60, doc.y, { width: 200, height: 80 });
-        doc.y += 80;
-        doc.moveDown(0.3);
-      }
+        doc.fontSize(10).fillColor(COLOR_MUTED).text(signedDate, colX, doc.y, { width: 200, align: "left" });
 
-      writeLine(signature.legalName, { font: FONT_BOLD, size: 12 });
-      doc.moveDown(0.15);
+        if (doc.y > maxY) maxY = doc.y;
+      });
 
-      const signedDate = new Date(signature.signedAt).toLocaleDateString(
-        "en-US",
-        { year: "numeric", month: "long", day: "numeric" },
-      );
-      writeLine(signedDate, { size: 10, color: COLOR_MUTED });
+      doc.y = maxY;
     }
 
     doc.end();
