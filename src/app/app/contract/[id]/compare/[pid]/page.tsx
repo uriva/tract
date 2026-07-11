@@ -384,6 +384,15 @@ function CompareView({
     );
   }
 
+  const leftHead = isTheirVersionLater ? myHead : theirHead;
+  const rightHead = isTheirVersionLater ? theirHead : myHead;
+
+  const leftParticipant = isTheirVersionLater ? myParticipant : theirParticipant;
+  const rightParticipant = isTheirVersionLater ? theirParticipant : myParticipant;
+
+  const leftIsMe = isTheirVersionLater;
+  const rightIsMe = !isTheirVersionLater;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -406,49 +415,65 @@ function CompareView({
 
       {/* Version info */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Left Card: Your version */}
+        {/* Left Card */}
         <div className="p-3 rounded-lg border border-border bg-card">
           <div className="text-xs text-muted-foreground">
-            Your version {isTheirVersionLater ? "(earlier)" : "(later)"}
+            {leftIsMe ? (
+              <span>Your version (earlier)</span>
+            ) : (
+              <span>
+                <span title={leftParticipant.email || undefined}>
+                  {displayName(leftParticipant.email, leftParticipant.user?.id)}
+                </span>
+                &apos;s version (earlier)
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs font-mono">{myHead.id.slice(0, 7)}</span>
+            <span className="text-xs font-mono">{leftHead.id.slice(0, 7)}</span>
             <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
             <span className="text-[10px] text-muted-foreground">
-              {new Date(myHead.createdAt).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
+              {new Date(leftHead.createdAt).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
             </span>
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">{myHead.message}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{leftHead.message}</div>
         </div>
 
-        {/* Right Card: Their version */}
+        {/* Right Card */}
         <div className="p-3 rounded-lg border border-border bg-card">
           <div className="text-xs text-muted-foreground">
-            <span title={theirParticipant.email || undefined}>
-              {displayName(theirParticipant.email, theirParticipant.user?.id)}
-            </span>&apos;s version {isTheirVersionLater ? "(later)" : "(earlier)"}
+            {rightIsMe ? (
+              <span>Your version (later)</span>
+            ) : (
+              <span>
+                <span title={rightParticipant.email || undefined}>
+                  {displayName(rightParticipant.email, rightParticipant.user?.id)}
+                </span>
+                &apos;s version (later)
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs font-mono">{theirHead.id.slice(0, 7)}</span>
+            <span className="text-xs font-mono">{rightHead.id.slice(0, 7)}</span>
             <span className="text-muted-foreground/30 text-[10px]">&bull;</span>
             <span className="text-[10px] text-muted-foreground">
-              {new Date(theirHead.createdAt).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
+              {new Date(rightHead.createdAt).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
             </span>
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">{theirHead.message}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{rightHead.message}</div>
         </div>
       </div>
 
       {/* Diff viewer */}
       <DiffViewer
-        key={`${myHead.id}-${theirHead.id}`}
-        myContent={myHead.content}
-        theirContent={theirHead.content}
+        key={`${leftHead.id}-${rightHead.id}`}
+        myContent={leftHead.content}
+        theirContent={rightHead.content}
         theirEmail={displayName(theirParticipant.email, theirParticipant.user?.id)}
         onApprove={handleApprove}
         applying={applying}
         contractId={contractId}
-        commitId={theirHead.id}
+        commitId={rightHead.id}
         issues={contract?.issues ?? []}
         onToggleIssueStatus={handleToggleIssueStatus}
       />
