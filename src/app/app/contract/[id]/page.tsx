@@ -31,6 +31,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SignDialog } from "@/components/sign-dialog";
 import { displayName, assignParticipantColors, normalizeMarkdown, isGuestUser, isInviteTemplateParticipant } from "@/lib/utils";
 import { visibleCommits } from "@/lib/commit-layout";
+import { reportError } from "@/lib/report-error";
 import { toast } from "sonner";
 import { LinkifiedText } from "@/components/linkified-text";
 
@@ -249,7 +250,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         .link({ commit: activeCommitId });
     }
 
-    await db.transact(txs);
+    await db.transact(txs).catch(reportError("Couldn't post the discussion"));
     setNewIssueTitle("");
     setNewCommentContent("");
     navigateTo("issues", issueId);
@@ -273,7 +274,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         })
         .link({ issue: issueId })
         .link({ creator: user.id }),
-    ]);
+    ]).catch(reportError("Couldn't post the reply"));
 
     setReplyContents({ ...replyContents, [issueId]: "" });
 
@@ -290,14 +291,14 @@ function ContractEditor({ contractId }: { contractId: string }) {
       db.tx.issues[issueId].update({
         status: newStatus,
       }),
-    ]);
+    ]).catch(reportError("Couldn't update the discussion"));
   }
 
   async function handleDeleteComment(commentId: string) {
     if (!confirm("Are you sure you want to delete this comment?")) return;
     await db.transact([
       db.tx.comments[commentId].delete()
-    ]);
+    ]).catch(reportError("Couldn't delete the comment"));
   }
 
   function getTimeAgo(timestamp: number): string {
@@ -684,7 +685,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
       db.tx.participants[myParticipant.id].update({
         headCommitId: commitId,
       }),
-    ]);
+    ]).catch(reportError("Couldn't switch to that version"));
     const targetCommit = commits.find((c) => c.id === commitId);
     if (targetCommit) {
       setContent(targetCommit.content);
@@ -761,7 +762,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         .link({ parent: myHeadCommitId });
     }
 
-    await db.transact(txs);
+    await db.transact(txs).catch(reportError("Couldn't save your changes"));
     setCommitMsg("");
     setSaving(false);
     setMode("view");
@@ -775,7 +776,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
     }
     await db.transact([
       db.tx.contracts[contract.id].update({ name: trimmed }),
-    ]);
+    ]).catch(reportError("Couldn't rename the contract"));
     setEditingName(false);
   }
 
@@ -841,7 +842,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         db.tx.pullRequests[activePR.id].update({
           status: "merged",
         }),
-      ]);
+      ]).catch(reportError("Couldn't merge the changes"));
       navigateTo("pull-requests", null, null);
       return;
     }
@@ -873,7 +874,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
       );
     }
 
-    await db.transact(txs);
+    await db.transact(txs).catch(reportError("Couldn't merge the changes"));
 
     if (approvedCount >= totalCount) {
       navigateTo("pull-requests", null, null);
@@ -889,7 +890,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
       db.tx.pullRequests[activePR.id].update({
         status: "closed",
       }),
-    ]);
+    ]).catch(reportError("Couldn't close the pull request"));
     navigateTo("pull-requests", null, null);
   }
 
@@ -902,7 +903,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         signatureData,
         signedAt: Date.now(),
       }),
-    ]);
+    ]).catch(reportError("Couldn't save your signature"));
     // If we were waiting to download, do it now
     if (pendingDownload.current) {
       pendingDownload.current = false;
@@ -925,7 +926,7 @@ function ContractEditor({ contractId }: { contractId: string }) {
         .link({ commit: activeCommitId })
         .link({ contract: contractId })
         .link({ creator: user.id }),
-    ]);
+    ]).catch(reportError("Couldn't save your signature"));
   }
 
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -1951,7 +1952,9 @@ function ContractEditor({ contractId }: { contractId: string }) {
                       <button
                         className="hover:text-foreground transition-colors cursor-pointer"
                         onClick={() => {
-                          navigator.clipboard.writeText(displayContent);
+                          navigator.clipboard
+                            .writeText(displayContent)
+                            .catch(reportError("Couldn't copy to clipboard"));
                           setCopied(true);
                           setTimeout(() => setCopied(false), 2000);
                         }}

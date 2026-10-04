@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { displayName } from "@/lib/utils";
+import { reportError } from "@/lib/report-error";
 
 interface InviteDialogProps {
   contractId: string;
@@ -264,7 +265,9 @@ export function InviteDialog({
                   type="button"
                   size="sm"
                   onClick={() => {
-                    navigator.clipboard.writeText(inviteLink);
+                    navigator.clipboard
+                      .writeText(inviteLink)
+                      .catch(reportError("Couldn't copy to clipboard"));
                     setCopiedLink(true);
                     setTimeout(() => setCopiedLink(false), 2000);
                   }}

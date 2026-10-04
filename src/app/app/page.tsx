@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import db from "@/lib/instant";
+import { isGuestUser } from "@/lib/utils";
+import { reportError } from "@/lib/report-error";
 import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +56,16 @@ function DashboardContent() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim() || !user) return;
+
+    // Guests have no email, so the initial commit is rejected by the perms.
+    if (isGuestUser(user)) {
+      toast.error("Add your email to create a contract", {
+        description:
+          "Guest accounts are read-only. Sign out, then sign in with your email to create your own contract.",
+      });
+      return;
+    }
+
     setCreating(true);
 
     const contractId = id();
@@ -83,7 +96,7 @@ function DashboardContent() {
         })
         .link({ contract: contractId })
         .link({ user: user.id }),
-    ]);
+    ]).catch(reportError("Couldn't create the contract"));
 
     setDialogOpen(false);
     setNewName("");

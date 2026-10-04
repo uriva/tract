@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { displayName } from "@/lib/utils";
+import { reportError } from "@/lib/report-error";
 import { LinkifiedText } from "@/components/linkified-text";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,7 +95,7 @@ export function ProseBlock({
         .link({ commit: commitId });
     }
 
-    await db.transact(txs);
+    await db.transact(txs).catch(reportError("Couldn't post the comment"));
     const content = newCommentInput.trim();
     setNewCommentInput("");
     setShowCommentForm(false);
@@ -116,7 +117,7 @@ export function ProseBlock({
         })
         .link({ issue: issueId })
         .link({ creator: user.id }),
-    ]);
+    ]).catch(reportError("Couldn't post the reply"));
 
     setCommentReplyContents({ ...commentReplyContents, [issueId]: "" });
 
@@ -131,7 +132,7 @@ export function ProseBlock({
     if (!confirm("Are you sure you want to delete this comment?")) return;
     await db.transact([
       db.tx.comments[commentId].delete()
-    ]);
+    ]).catch(reportError("Couldn't delete the comment"));
   }
 
   function getTimeAgo(timestamp: number): string {

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { DiffViewer } from "@/components/diff-viewer";
 import { displayName } from "@/lib/utils";
+import { reportError } from "@/lib/report-error";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
@@ -120,8 +121,9 @@ export function CommitDetailDialog({
                             .link({ sourceCommit: commit.id })
                             .link({ targetParticipant: p.id })
                             .link({ requester: user.id }),
-                        ]);
-                        alert(`Request sent to ${name}!`);
+                        ])
+                          .then(() => alert(`Request sent to ${name}!`))
+                          .catch(reportError("Couldn't send the request"));
                       }}
                     >
                       Ask {name}

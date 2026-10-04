@@ -14,6 +14,7 @@ import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
 import { DiffViewer } from "@/components/diff-viewer";
 import { computeLineDiffs } from "@/lib/diff";
+import { reportError } from "@/lib/report-error";
 import { displayName, normalizeMarkdown, isInviteTemplateParticipant } from "@/lib/utils";
 
 // Count the number of change hunks between two documents (a hunk is a run of
@@ -135,7 +136,7 @@ function CompareView({
         .link({ commit: targetCommit.id });
     }
 
-    await db.transact(txs);
+    await db.transact(txs).catch(reportError("Couldn't post the discussion"));
     setNewIssueTitle("");
     setNewCommentContent("");
 
@@ -158,7 +159,7 @@ function CompareView({
         })
         .link({ issue: issueId })
         .link({ creator: user.id }),
-    ]);
+    ]).catch(reportError("Couldn't post the reply"));
 
     setReplyContents({ ...replyContents, [issueId]: "" });
 
@@ -175,14 +176,14 @@ function CompareView({
       db.tx.issues[issueId].update({
         status: newStatus,
       }),
-    ]);
+    ]).catch(reportError("Couldn't update the discussion"));
   }
 
   async function handleDeleteComment(commentId: string) {
     if (!confirm("Are you sure you want to delete this comment?")) return;
     await db.transact([
       db.tx.comments[commentId].delete()
-    ]);
+    ]).catch(reportError("Couldn't delete the comment"));
   }
 
   function getTimeAgo(timestamp: number): string {
@@ -272,7 +273,7 @@ function CompareView({
         db.tx.participants[myParticipant.id].update({
           headCommitId: theirHead.id,
         }),
-      ]);
+      ]).catch(reportError("Couldn't apply the changes"));
       setApplying(false);
       router.push(`/app/contract/${contractId}`);
       return;
@@ -317,7 +318,7 @@ function CompareView({
           // eslint-disable-next-line react-hooks/purity
           createdAt: Date.now(),
         }),
-      ]);
+      ]).catch(reportError("Couldn't apply the changes"));
     } else {
       const message = `Accept ${approvedCount}/${totalCount} changes from ${theirName}`;
       const newCommitId = id();
@@ -335,7 +336,7 @@ function CompareView({
         db.tx.participants[myParticipant.id].update({
           headCommitId: newCommitId,
         }),
-      ]);
+      ]).catch(reportError("Couldn't apply the changes"));
     }
 
     setApplying(false);
@@ -361,7 +362,7 @@ function CompareView({
       db.tx.participants[myParticipant.id].update({
         closedCommitIds: JSON.stringify(newClosed),
       }),
-    ]);
+    ]).catch(reportError("Couldn't close the pull request"));
     router.push(`/app/contract/${contractId}`);
   }
 
@@ -372,7 +373,7 @@ function CompareView({
       db.tx.participants[myParticipant.id].update({
         closedCommitIds: JSON.stringify(newClosed),
       }),
-    ]);
+    ]).catch(reportError("Couldn't reopen the pull request"));
   }
 
   if (isLoading) {

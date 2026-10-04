@@ -13,6 +13,7 @@ import { MentionInput, MentionTextarea } from "@/components/mention-input";
 import db from "@/lib/instant";
 import { id } from "@instantdb/react";
 import { displayName } from "@/lib/utils";
+import { reportError } from "@/lib/report-error";
 
 interface DiffViewerProps {
   myContent: string;
@@ -198,7 +199,7 @@ export function DiffViewer({
         .link({ commit: commitId });
     }
 
-    await db.transact(txs);
+    await db.transact(txs).catch(reportError("Couldn't post the comment"));
     setNewCommentInput("");
     setActiveCommentLine(null);
 
@@ -219,7 +220,7 @@ export function DiffViewer({
         })
         .link({ issue: issueId })
         .link({ creator: user.id }),
-    ]);
+    ]).catch(reportError("Couldn't post the reply"));
 
     setCommentReplyContents({ ...commentReplyContents, [issueId]: "" });
 
@@ -234,7 +235,7 @@ export function DiffViewer({
     if (!confirm("Are you sure you want to delete this comment?")) return;
     await db.transact([
       db.tx.comments[commentId].delete()
-    ]);
+    ]).catch(reportError("Couldn't delete the comment"));
   }
 
   function getTimeAgo(timestamp: number): string {
@@ -461,7 +462,9 @@ export function DiffViewer({
                 size="sm"
                 className="text-[11px] h-7 px-2.5"
                 onClick={() => {
-                  navigator.clipboard.writeText(isEditingManually ? manualText : previewContent);
+                  navigator.clipboard
+                    .writeText(isEditingManually ? manualText : previewContent)
+                    .catch(reportError("Couldn't copy to clipboard"));
                   setCopiedMerged(true);
                   setTimeout(() => setCopiedMerged(false), 2000);
                 }}

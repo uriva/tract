@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import db from "@/lib/instant";
+import { reportError } from "@/lib/report-error";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +42,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {user?.email}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => db.auth.signOut()}>
+                <DropdownMenuItem
+                  onClick={() => db.auth.signOut().catch(reportError("Couldn't sign out"))}
+                >
                   Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
