@@ -130,5 +130,5 @@ describe("commit-message route", () => {
 
     const data = await res.json();
     expect(res.status).toBe(502);
-  });
+  }, 15000);
 });

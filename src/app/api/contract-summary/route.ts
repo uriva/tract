@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { init } from "@instantdb/admin";
+import { geminiGenText, injectGeminiToken } from "@jsr/uri__ai-utils";
 import schema from "../../../../instant.schema";
 
 const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID?.trim()!;
 const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN?.trim()!;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${GEMINI_API_KEY}`;
 
 const adminDb = init({ appId: APP_ID, adminToken: ADMIN_TOKEN, schema });
 
@@ -91,31 +91,15 @@ ${agreementNote}
 
 Keep it short and direct. Emphasize recent activity and who made which changes. Use first names (part before @ in emails). Plain text only, no markdown or quotes.`;
 
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        { role: "user", parts: [{ text: prompt }] },
-      ],
-      generationConfig: {
-        temperature: 0.2,
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("Gemini API error:", err);
-    return NextResponse.json(
-      { error: "Failed to generate summary" },
-      { status: 502 },
-    );
-  }
-
-  const data = await res.json();
-  const summary =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+  const summary = await injectGeminiToken(GEMINI_API_KEY)(async () => {
+    try {
+      const text = await (geminiGenText as any)({ tier: "flash" }, prompt);
+      return text?.trim() ?? "";
+    } catch (err) {
+      console.error("ai-utils geminiGenText error:", err);
+      return "";
+    }
+  })();
 
   if (!summary) {
     return NextResponse.json(
