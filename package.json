@@ -13,7 +13,7 @@
     "@instantdb/admin": "^0.22.174",
     "@instantdb/react": "^0.22.174",
     "@jsr/uri__ai-utils": "^0.3.80",
-    "@uri/anomalisa": "npm:@jsr/uri__anomalisa@^0.0.42",
+    "@uri/anomalisa": "npm:@jsr/uri__anomalisa@^0.0.45",
     "bidi-js": "^1.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
